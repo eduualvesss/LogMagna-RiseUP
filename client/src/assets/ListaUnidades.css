@@ -1,0 +1,209 @@
+/* Cores iguais às do App.jsx do projeto (verde #1a3326, fundo claro, cards brancos). */
+.unidades {
+  --cor-texto: #111827;
+  --cor-texto-suave: #6b7280;
+  --cor-fundo-card: #ffffff;
+  --cor-borda: #e5e7eb;
+  --cor-destaque: #1a3326;
+  --cor-destaque-hover: #2d4a3e;
+  --cor-suave: #e8f0eb;
+  --cor-perigo: #b91c1c;
+  --cor-perigo-fundo: #fef2f2;
+  --cor-ativa-fundo: #dcfce7;
+  --cor-ativa-texto: #166534;
+  --cor-inativa-fundo: #f3f4f6;
+  --cor-inativa-texto: #4b5563;
+
+  color: var(--cor-texto);
+  font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+.unidades__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.unidades__topo h1 {
+  margin: 0;
+  font-size: 1.875rem;
+  font-weight: 700;
+}
+
+.unidades__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.unidades__filtros input {
+  flex: 1 1 240px;
+}
+
+.unidades input,
+.unidades select {
+  padding: 10px 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+}
+
+.unidades input:focus,
+.unidades select:focus {
+  outline: none;
+  border-color: var(--cor-destaque);
+}
+
+.btn {
+  padding: 8px 16px;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--cor-texto);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #f9fafb;
+}
+
+.btn--primario {
+  border-color: var(--cor-destaque);
+  background: var(--cor-destaque);
+  color: #ffffff;
+}
+
+.btn--primario:hover {
+  background: var(--cor-destaque-hover);
+}
+
+.btn--link {
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: var(--cor-destaque);
+}
+
+.btn--link:hover {
+  background: var(--cor-suave);
+}
+
+.btn--perigo {
+  color: var(--cor-perigo);
+}
+
+.btn--perigo:hover {
+  background: var(--cor-perigo-fundo);
+}
+
+.unidades__erro {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--cor-perigo-fundo);
+  color: var(--cor-perigo);
+  font-size: 0.875rem;
+}
+
+.unidades__vazio {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--cor-texto-suave);
+}
+
+.unidades__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 24px;
+  border: 1px solid var(--cor-borda);
+  border-radius: 12px;
+  background: var(--cor-fundo-card);
+}
+
+.unidades__form h2 {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.unidades__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.unidades__acoes-form {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Tabela dentro de um card branco, como nas outras telas */
+.unidades__tabela-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--cor-borda);
+  border-radius: 12px;
+  background: var(--cor-fundo-card);
+}
+
+.unidades__tabela {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.unidades__tabela th,
+.unidades__tabela td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.unidades__tabela th {
+  background: #f9fafb;
+  color: var(--cor-texto-suave);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.unidades__tabela tbody tr:hover {
+  background: #f9fafb;
+}
+
+.unidades__acoes {
+  display: flex;
+  gap: 4px;
+}
+
+.selo {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.selo--ativa {
+  background: var(--cor-ativa-fundo);
+  color: var(--cor-ativa-texto);
+}
+
+.selo--inativa {
+  background: var(--cor-inativa-fundo);
+  color: var(--cor-inativa-texto);
+}

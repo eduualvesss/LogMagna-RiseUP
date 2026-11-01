@@ -6,6 +6,7 @@ import {
   Laptop, Headphones, Camera, Leaf, ChevronRight
 } from 'lucide-react';
 import boxesImg from './assets/boxes.jpg';
+import ListaUnidades from './assets/ListaUnidades';
 
 // --- COMPONENTES VISUAIS ---
 
@@ -27,6 +28,7 @@ const Sidebar = () => {
     { path: '/services', label: 'Serviços contratados', icon: ShieldCheck },
     { path: '/tracking', label: 'Rastrear encomenda', icon: PackageSearch },
     { path: '/add', label: 'Cadastrar produto', icon: PlusCircle },
+     { path: '/unidades', label: 'Unidades', icon: Box },
   ];
 
   return (
@@ -612,6 +614,7 @@ function App() {
         <Route path="/services" element={<Services />} />
         <Route path="/tracking" element={<Tracking />} />
         <Route path="/add" element={<AddProduct />} />
+        <Route path="/unidades" element={<Layout title="Unidades"><ListaUnidades /></Layout>} />
       </Routes>
     </Router>
   );
