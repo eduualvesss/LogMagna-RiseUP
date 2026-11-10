@@ -27,3 +27,7 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Next.js
+.next/
+out/

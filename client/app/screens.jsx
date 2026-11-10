@@ -1,5 +1,8 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, ShieldCheck, PackageSearch, PlusCircle,
   Truck, Box, CheckCircle, Clock, Info, ArrowRight, Search,
@@ -21,7 +24,7 @@ const Logo = ({ className = "w-10 h-10 text-[#3f6b4d]" }) => (
 );
 
 const Sidebar = () => {
-  const location = useLocation();
+  const pathname = usePathname();
   const menuItems = [
     { path: '/dashboard', label: 'Visão geral', icon: LayoutDashboard },
     { path: '/services', label: 'Serviços contratados', icon: ShieldCheck },
@@ -39,11 +42,11 @@ const Sidebar = () => {
       <div className="px-4 mb-2 text-xs text-gray-400 uppercase font-semibold">Área do Cliente</div>
       <nav className="flex-1 px-4 space-y-2">
         {menuItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive = pathname === item.path;
           return (
             <Link
               key={item.path}
-              to={item.path}
+              href={item.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-[#2d4a3e] text-white' : 'text-gray-300 hover:bg-[#2d4a3e]/50'
                 }`}
             >
@@ -101,14 +104,14 @@ const Layout = ({ children, title }) => (
 
 // --- PÁGINAS ---
 
-const Dashboard = () => (
+export const Dashboard = () => (
   <Layout title="Visão geral">
     <div className="mb-8 flex justify-between items-end">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Bom dia, Ana.</h1>
         <p className="text-gray-500 mt-1">Suas compras e encomendas, com uma visão mais tranquila.</p>
       </div>
-      <Link to="/add" className="bg-[#1a3326] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#2d4a3e] transition">
+      <Link href="/add" className="bg-[#1a3326] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#2d4a3e] transition">
         <PlusCircle size={18} /> Cadastrar produto
       </Link>
     </div>
@@ -160,7 +163,7 @@ const Dashboard = () => (
             <p className="text-xs text-gray-500">Previsão de entrega</p>
             <p className="font-bold text-gray-900">08 de outubro de 2026</p>
           </div>
-          <Link to="/tracking" className="border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
+          <Link href="/tracking" className="border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
             Ver rastreio <ArrowRight size={16} />
           </Link>
         </div>
@@ -171,7 +174,7 @@ const Dashboard = () => (
         <Leaf size={32} className="text-[#1a3326] mb-4" />
         <h3 className="text-xl font-bold text-[#1a3326] mb-2">Uma nova compra?<br />Comece por aqui.</h3>
         <p className="text-sm text-gray-600 mb-6">Adicione seu produto e confira o resumo de valores antes de concluir o cadastro demonstrativo.</p>
-        <Link to="/add" className="bg-[#1a3326] text-white px-4 py-3 rounded-lg text-center font-medium hover:bg-[#2d4a3e] transition flex items-center justify-center gap-2">
+        <Link href="/add" className="bg-[#1a3326] text-white px-4 py-3 rounded-lg text-center font-medium hover:bg-[#2d4a3e] transition flex items-center justify-center gap-2">
           <PlusCircle size={18} /> Cadastrar novo produto
         </Link>
       </div>
@@ -179,7 +182,7 @@ const Dashboard = () => (
   </Layout>
 );
 
-const Services = () => {
+export const Services = () => {
   const [products, setProducts] = useState([]);
 
   useEffect(() => {
@@ -196,7 +199,7 @@ const Services = () => {
           <h1 className="text-3xl font-bold text-gray-900">Serviços contratados</h1>
           <p className="text-gray-500 mt-1">Consulte seus produtos e os registros de seguros demonstrativos.</p>
         </div>
-        <Link to="/add" className="bg-[#1a3326] text-white px-4 py-2 rounded-lg flex items-center gap-2">
+        <Link href="/add" className="bg-[#1a3326] text-white px-4 py-2 rounded-lg flex items-center gap-2">
           <PlusCircle size={18} /> Cadastrar produto
         </Link>
       </div>
@@ -266,7 +269,7 @@ const Services = () => {
   );
 };
 
-const Tracking = () => {
+export const Tracking = () => {
   const [code, setCode] = useState('BR123456789SP');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -368,7 +371,7 @@ const Tracking = () => {
   );
 };
 
-const AddProduct = () => {
+export const AddProduct = () => {
   const [form, setForm] = useState({ name: 'Mouse Logitech MX Master 3S', value: '350', store: 'Loja Exemplo', tracking: '' });
   const [msg, setMsg] = useState('');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -473,7 +476,7 @@ const AddProduct = () => {
 
         {msg && <div className="p-3 rounded-lg bg-[#e8f0eb] text-[#1a3326] text-sm">{msg}</div>}
         <div className="flex justify-between pt-4">
-          <Link to="/dashboard" className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">Cancelar</Link>
+          <Link href="/dashboard" className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">Cancelar</Link>
           <button onClick={submit} className="px-6 py-2 bg-[#1a3326] text-white rounded-lg font-medium hover:bg-[#2d4a3e] flex items-center gap-2">
             <CheckCircle size={18} /> Cadastrar produto (demo)
           </button>
@@ -520,7 +523,7 @@ const AddProduct = () => {
   );
 };
 
-const LandingPage = () => (
+export const LandingPage = () => (
   <div className="min-h-screen bg-[#f4f6f5] font-sans">
     <nav className="bg-[#1a3326] text-white p-4 flex justify-between items-center px-8">
       <div className="flex items-center gap-2">
@@ -532,8 +535,8 @@ const LandingPage = () => (
         <a href="#" className="hover:text-gray-300">Sobre a LogMagna</a>
       </div>
       <div className="flex gap-3">
-        <Link to="/dashboard" className="px-4 py-2 border border-gray-600 rounded-lg hover:bg-white/10 transition">Área do cliente</Link>
-        <Link to="/add" className="px-4 py-2 bg-[#4a6b56] rounded-lg hover:bg-[#5c826a] transition">Criar cadastro</Link>
+        <Link href="/dashboard" className="px-4 py-2 border border-gray-600 rounded-lg hover:bg-white/10 transition">Área do cliente</Link>
+        <Link href="/add" className="px-4 py-2 bg-[#4a6b56] rounded-lg hover:bg-[#5c826a] transition">Criar cadastro</Link>
       </div>
     </nav>
 
@@ -543,10 +546,10 @@ const LandingPage = () => (
         <h1 className="text-5xl font-bold text-[#1a3326] mt-6 mb-6 leading-tight">Mais cuidado com o que chega até você.</h1>
         <p className="text-gray-600 text-lg mb-8">Uma nova forma de gerenciar seguros de encomendas e compras online. Cadastre seus produtos, visualize seus serviços e acompanhe cada entrega em um só lugar.</p>
         <div className="flex gap-4">
-          <Link to="/dashboard" className="bg-[#1a3326] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#2d4a3e] flex items-center gap-2">
+          <Link href="/dashboard" className="bg-[#1a3326] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#2d4a3e] flex items-center gap-2">
             <ArrowRight size={18} /> Conhecer a área do cliente
           </Link>
-          <Link to="/add" className="bg-white text-[#1a3326] border border-gray-200 px-6 py-3 rounded-lg font-medium hover:bg-gray-50">
+          <Link href="/add" className="bg-white text-[#1a3326] border border-gray-200 px-6 py-3 rounded-lg font-medium hover:bg-gray-50">
             Criar meu cadastro
           </Link>
         </div>
@@ -561,7 +564,7 @@ const LandingPage = () => (
           <p className="text-xs text-gray-500">Do cadastro à entrega, tudo no seu painel.</p>
         </div>
         <div className="rounded-3xl h-96 w-full overflow-hidden">
-          <img src={boxesImg} alt="Encomendas empilhadas" className="w-full h-full object-cover" />
+          <img src={boxesImg.src} alt="Encomendas empilhadas" className="w-full h-full object-cover" />
         </div>
       </div>
     </header>
@@ -601,20 +604,3 @@ const LandingPage = () => (
   </div>
 );
 
-// --- APP PRINCIPAL ---
-
-function App() {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/tracking" element={<Tracking />} />
-        <Route path="/add" element={<AddProduct />} />
-      </Routes>
-    </Router>
-  );
-}
-
-export default App;
