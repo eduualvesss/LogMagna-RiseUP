@@ -4,10 +4,11 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { useEffect, useState } from "react";
 import { Skeleton } from "./Loading";
 import { authFetch } from "../lib/auth";
+import { API_URL } from "../lib/config";
 import "./ListaUnidades.css";
 
 // Ajuste se o servidor da equipe usar outra porta.
-const API = "http://localhost:3001/api/unidades";
+const API = `${API_URL}/unidades`;
 
 const TIPOS = ["Matriz", "Filial", "Centro de distribuição"];
 

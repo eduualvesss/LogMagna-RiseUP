@@ -25,7 +25,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.get('/api/products', requireAuth, (req, res) => res.json(products));
 
 app.post('/api/products', requireAuth, (req, res) => {
-  const { name, value, store, destination, tracking } = req.body || {};
+  const { name, value, store, destination, tracking, purchaseDate, cep } = req.body || {};
   const num = Number(value);
   if (!name || !Number.isFinite(num) || num <= 0) {
     return res.status(400).json({ error: 'Nome e valor válidos são obrigatórios.' });
@@ -38,6 +38,8 @@ app.post('/api/products', requireAuth, (req, res) => {
     status: 'Aguardando',
     tracking: tracking || '',
     store: store || '',
+    purchaseDate: typeof purchaseDate === 'string' ? purchaseDate : '',
+    cep: typeof cep === 'string' ? cep : '',
     origin: 'Origem demo',
     destination: destination || 'São Paulo, SP',
   };

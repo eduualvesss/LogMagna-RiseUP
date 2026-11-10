@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import type { ReactNode, ChangeEvent, CSSProperties } from 'react';
 import { Spinner, Skeleton, TableSkeleton, PageSkeleton } from './components/Loading';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { authFetch, clearSession, useRequireAuth } from './lib/auth';
+import { API_URL } from './lib/config';
 import type { User } from './lib/auth';
 import {
   LayoutDashboard, ShieldCheck, PackageSearch, PlusCircle,
@@ -22,6 +23,9 @@ interface Product {
   value: number;
   cost: number;
   status: string;
+  tracking: string;
+  origin: string;
+  destination: string;
 }
 
 interface TrackingEvent {
@@ -40,9 +44,14 @@ interface TrackingData {
   history: TrackingEvent[];
 }
 
-type ProductForm = { name: string; value: string; store: string; tracking: string };
+type ProductForm = { name: string; value: string; store: string; tracking: string; purchaseDate: string; cep: string; destination: string };
 
 // --- COMPONENTES VISUAIS ---
+
+const UserContext = createContext<User | null>(null);
+const useUser = () => useContext(UserContext);
+const iniciais = (nome: string) => nome.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+const saudacao = () => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; };
 
 // Logo SVG (Fundo transparente, cores corrigidas)
 export const Logo = ({ className = "w-10 h-10 text-[#3f6b4d]" }: { className?: string }) => (
@@ -57,6 +66,7 @@ export const Logo = ({ className = "w-10 h-10 text-[#3f6b4d]" }: { className?: s
 
 const Sidebar = () => {
   const pathname = usePathname();
+  const user = useUser();
   const menuItems = [
     { path: '/dashboard', label: 'Visão geral', icon: LayoutDashboard },
     { path: '/services', label: 'Serviços contratados', icon: ShieldCheck },
@@ -97,10 +107,10 @@ const Sidebar = () => {
       </div>
 
       <div className="p-4 border-t border-gray-700 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold">AS</div>
+        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold">{user ? iniciais(user.nome) : ''}</div>
         <div>
-          <p className="text-sm font-medium">Ana Silva</p>
-          <p className="text-xs text-gray-400">Conta demonstrativa</p>
+          <p className="text-sm font-medium">{user?.nome}</p>
+          <p className="text-xs text-gray-400 capitalize">{user?.papel} • demonstração</p>
         </div>
       </div>
     </aside>
@@ -136,6 +146,7 @@ export const Layout = ({ children, title }: { children: ReactNode; title: string
   if (!user) return <PageSkeleton />;
 
   return (
+  <UserContext.Provider value={user}>
   <div className="flex bg-[#f4f6f5] min-h-screen">
     <Sidebar />
     <div className="ml-64 flex-1 flex flex-col">
@@ -148,16 +159,38 @@ export const Layout = ({ children, title }: { children: ReactNode; title: string
       </footer>
     </div>
   </div>
+  </UserContext.Provider>
   );
 };
 
 // --- PÁGINAS ---
 
-export const Dashboard = () => (
-  <Layout title="Visão geral">
+const DashboardContent = () => {
+  const user = useUser();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    authFetch(`${API_URL}/products`)
+      .then(res => res.json())
+      .then(data => setProducts(Array.isArray(data) ? data : []))
+      .catch((err: Error) => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const totalValor = products.reduce((t, p) => t + p.value, 0);
+  const totalCusto = products.reduce((t, p) => t + p.cost, 0);
+  const emTransito = products.filter(p => p.status === 'Em trânsito');
+  const aguardando = products.filter(p => p.status === 'Aguardando');
+  const pendentes = [...emTransito, ...aguardando];
+  const proxima = emTransito[0] ?? aguardando[0];
+
+  return (
+    <>
     <div className="mb-8 flex justify-between items-end">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Bom dia, Ana.</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{saudacao()}, {user?.nome.split(' ')[0]}.</h1>
         <p className="text-gray-500 mt-1">Suas compras e encomendas, com uma visão mais tranquila.</p>
       </div>
       <Link href="/add" className="bg-[#1a3326] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#2d4a3e] transition">
@@ -168,17 +201,17 @@ export const Dashboard = () => (
     {/* Stats Cards */}
     <div className="grid grid-cols-4 gap-6 mb-8">
       {[
-        { label: 'Serviços ativos', value: '3', sub: 'Registros demonstrativos', icon: ShieldCheck },
-        { label: 'Valor dos produtos', value: 'R$ 8.000,00', sub: 'Soma dos 3 produtos', icon: Box },
-        { label: 'Entregas pendentes', value: '2', sub: '1 em trânsito • 1 aguardando', icon: Truck },
-        { label: 'Custo simulado', value: 'R$ 160,00', sub: 'Total por envio • sem cobrança', icon: PackageSearch },
+        { label: 'Serviços ativos', value: String(products.length), sub: 'Registros demonstrativos', icon: ShieldCheck },
+        { label: 'Valor dos produtos', value: brl(totalValor), sub: `Soma dos ${products.length} produtos`, icon: Box },
+        { label: 'Entregas pendentes', value: String(pendentes.length), sub: `${emTransito.length} em trânsito • ${aguardando.length} aguardando`, icon: Truck },
+        { label: 'Custo simulado', value: brl(totalCusto), sub: 'Total por envio • sem cobrança', icon: PackageSearch },
       ].map((stat, i) => (
         <div key={i} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <span className="text-sm text-gray-500 font-medium">{stat.label}</span>
             <stat.icon size={20} className="text-gray-400" />
           </div>
-          <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
+          <div className="text-3xl font-bold text-gray-900 mb-1">{loading ? <Skeleton className="h-9 w-32" /> : stat.value}</div>
           <div className="text-xs text-gray-400">{stat.sub}</div>
         </div>
       ))}
@@ -189,22 +222,22 @@ export const Dashboard = () => (
       <div className="col-span-2 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-bold text-lg text-gray-900">Sua próxima entrega</h3>
-          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">Em trânsito</span>
+          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">{proxima?.status ?? '—'}</span>
         </div>
 
         <div className="flex items-center gap-4 mb-6">
           <div className="p-3 bg-gray-50 rounded-lg"><Laptop size={24} className="text-gray-600" /></div>
           <div>
-            <h4 className="font-bold text-gray-900">Notebook Dell Inspiron</h4>
-            <p className="text-xs text-gray-500">LM-2026-001 • BR123456789SP</p>
+            <h4 className="font-bold text-gray-900">{loading ? 'Carregando...' : proxima?.name ?? 'Nenhuma entrega em andamento'}</h4>
+            <p className="text-xs text-gray-500">{proxima ? `${proxima.id} • ${proxima.tracking}` : ''}</p>
           </div>
         </div>
 
         <div className="relative flex items-center justify-between mb-6 px-4">
           <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-200 -z-10"></div>
-          <div className="bg-white px-2 text-sm font-medium text-gray-700">Campinas, SP</div>
+          <div className="bg-white px-2 text-sm font-medium text-gray-700">{proxima?.origin ?? '—'}</div>
           <Truck size={20} className="text-[#1a3326] bg-white p-1 rounded-full" />
-          <div className="bg-white px-2 text-sm font-medium text-gray-700">São Paulo, SP</div>
+          <div className="bg-white px-2 text-sm font-medium text-gray-700">{proxima?.destination ?? '—'}</div>
         </div>
 
         <div className="flex justify-between items-center pt-4 border-t border-gray-100">
@@ -228,6 +261,13 @@ export const Dashboard = () => (
         </Link>
       </div>
     </div>
+    </>
+  );
+};
+
+export const Dashboard = () => (
+  <Layout title="Visão geral">
+    <DashboardContent />
   </Layout>
 );
 
@@ -236,7 +276,7 @@ export const Services = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    authFetch('http://localhost:3001/api/products')
+    authFetch(`${API_URL}/products`)
       .then(res => res.json())
       .then(data => setProducts(Array.isArray(data) ? data : []))
       .catch((err: Error) => console.error(err))
@@ -333,7 +373,7 @@ export const Tracking = () => {
   const handleSearch = () => {
     setError('');
     setLoading(true);
-    fetch(`http://localhost:3001/api/tracking/${encodeURIComponent(code.trim())}`)
+    fetch(`${API_URL}/tracking/${encodeURIComponent(code.trim())}`)
       .then(async res => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Erro ao rastrear.');
@@ -440,7 +480,7 @@ export const Tracking = () => {
 };
 
 export const AddProduct = () => {
-  const [form, setForm] = useState<ProductForm>({ name: 'Mouse Logitech MX Master 3S', value: '350', store: 'Loja Exemplo', tracking: '' });
+  const [form, setForm] = useState<ProductForm>({ name: 'Mouse Logitech MX Master 3S', value: '350', store: 'Loja Exemplo', tracking: '', purchaseDate: '06/10/2026', cep: '01310-100', destination: 'São Paulo / SP' });
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const set = (k: keyof ProductForm) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
@@ -450,10 +490,10 @@ export const AddProduct = () => {
   const submit = () => {
     setMsg('');
     setSubmitting(true);
-    authFetch('http://localhost:3001/api/products', {
+    authFetch(`${API_URL}/products`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, value: num }),
+      body: JSON.stringify({ ...form, destination: form.destination.replace(/\s*\/\s*/, ', ').trim(), value: num }),
     })
       .then(async res => {
         const json = await res.json();
@@ -475,7 +515,7 @@ export const AddProduct = () => {
     </div>
 
     <div className="grid grid-cols-3 gap-8">
-      <div className="col-span-2 space-y-6">
+      <form className="col-span-2 space-y-6" onSubmit={(e) => { e.preventDefault(); if (!submitting) submit(); }}>
         {/* Dados do Produto */}
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <div className="flex justify-between items-center mb-6">
@@ -507,7 +547,7 @@ export const AddProduct = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data da compra *</label>
-                <input type="text" defaultValue="06/10/2026" className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
+                <input type="text" value={form.purchaseDate} onChange={set('purchaseDate')} className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
               </div>
             </div>
           </div>
@@ -531,11 +571,11 @@ export const AddProduct = () => {
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">CEP de destino *</label>
-              <input type="text" defaultValue="01310-100" className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
+              <input type="text" value={form.cep} onChange={set('cep')} className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Cidade / UF *</label>
-              <input type="text" defaultValue="São Paulo / SP" className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
+              <input type="text" value={form.destination} onChange={set('destination')} className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
             </div>
           </div>
         </div>
@@ -548,11 +588,11 @@ export const AddProduct = () => {
         {msg && <div className="p-3 rounded-lg bg-[#e8f0eb] text-[#1a3326] text-sm animate-pop-in">{msg}</div>}
         <div className="flex justify-between pt-4">
           <Link href="/dashboard" className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">Cancelar</Link>
-          <button onClick={submit} disabled={submitting} className="px-6 py-2 bg-[#1a3326] text-white rounded-lg font-medium hover:bg-[#2d4a3e] disabled:opacity-70 disabled:cursor-wait transition flex items-center gap-2">
+          <button type="submit" disabled={submitting} className="px-6 py-2 bg-[#1a3326] text-white rounded-lg font-medium hover:bg-[#2d4a3e] disabled:opacity-70 disabled:cursor-wait transition flex items-center gap-2">
             {submitting ? <Spinner /> : <CheckCircle size={18} />} {submitting ? 'Cadastrando...' : 'Cadastrar produto (demo)'}
           </button>
         </div>
-      </div>
+      </form>
 
       {/* Sidebar Resumo */}
       <div className="space-y-6">
@@ -573,7 +613,7 @@ export const AddProduct = () => {
           <div className="space-y-3 text-sm mb-6">
             <div className="flex justify-between"><span className="text-gray-500">Valor do produto</span><span className="font-medium">{brl(num)}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Taxa ilustrativa</span><span className="font-medium">2% por envio</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Destino</span><span className="font-medium">São Paulo, SP</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Destino</span><span className="font-medium">{form.destination}</span></div>
           </div>
 
           <div className="pt-4 border-t border-gray-100">

@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export const API_URL = 'http://localhost:3001/api';
+import { API_URL } from './config';
+
+export { API_URL };
 const STORAGE_KEY = 'logmagna.session';
 
 export interface User {
