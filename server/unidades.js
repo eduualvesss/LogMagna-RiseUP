@@ -1,15 +1,10 @@
 const express = require("express");
 const router = express.Router();
+const seed = require('./seeds');
 
-// Dados em memória (temporário).
-// Quando a equipe definir o banco de dados, troque este array por consultas ao banco.
-let unidades = [
-  { id: 1, nome: "Matriz Recife", tipo: "Matriz", cidade: "Recife", estado: "PE", status: "ativa" },
-  { id: 2, nome: "CD Suape", tipo: "Centro de distribuição", cidade: "Ipojuca", estado: "PE", status: "ativa" },
-  { id: 3, nome: "Filial Salvador", tipo: "Filial", cidade: "Salvador", estado: "BA", status: "ativa" },
-  { id: 4, nome: "Filial Fortaleza", tipo: "Filial", cidade: "Fortaleza", estado: "CE", status: "inativa" },
-];
-let proximoId = 5;
+// Dados em memória vindos da seed (server/seeds). Troque por banco quando a equipe definir.
+let unidades = [...seed.unidades];
+let proximoId = Math.max(...unidades.map((u) => u.id)) + 1;
 
 const TIPOS = ["Matriz", "Filial", "Centro de distribuição"];
 const STATUS = ["ativa", "inativa"];

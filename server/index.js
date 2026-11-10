@@ -7,23 +7,13 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+// Latencia simulada para exibir loadings no front (MOCK_DELAY_MS=0 desativa).
+const MOCK_DELAY_MS = Number(process.env.MOCK_DELAY_MS ?? 600);
+app.use('/api', (req, res, next) => setTimeout(next, MOCK_DELAY_MS));
 app.use('/api/unidades', rotasUnidades);
 
-const RATE = 0.02;
-
-const products = [
-  { id: 'LM-2026-001', name: 'Notebook Dell Inspiron', value: 4200, status: 'Em trânsito', tracking: 'BR123456789SP', origin: 'Campinas, SP', destination: 'São Paulo, SP' },
-  { id: 'LM-2026-002', name: 'Fone Sony WH-1000XM5', value: 2000, status: 'Aguardando', tracking: 'BR987654321SP', origin: 'Curitiba, PR', destination: 'São Paulo, SP' },
-  { id: 'LM-2026-003', name: 'Câmera Canon EOS R50', value: 1800, status: 'Entregue', tracking: 'BR555444333SP', origin: 'Rio de Janeiro, RJ', destination: 'São Paulo, SP' },
-].map((p) => ({ ...p, cost: +(p.value * RATE).toFixed(2) }));
-
-const history = {
-  'BR123456789SP': [
-    { status: 'Pacote saiu para entrega', location: 'Centro de distribuição • São Paulo, SP', date: '08/10 • 08:15', current: true },
-    { status: 'Pacote em trânsito', location: 'Unidade de tratamento • Campinas, SP', date: '07/10 • 22:40' },
-    { status: 'Pacote postado', location: 'Agência • Campinas, SP', date: '06/10 • 09:42' },
-  ],
-};
+const { RATE, products, history } = require('./seeds');
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
