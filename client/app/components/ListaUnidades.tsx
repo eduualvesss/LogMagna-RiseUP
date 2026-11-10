@@ -3,6 +3,7 @@
 import type { ChangeEvent, FormEvent } from 'react';
 import { useEffect, useState } from "react";
 import { Skeleton } from "./Loading";
+import { authFetch } from "../lib/auth";
 import "./ListaUnidades.css";
 
 // Ajuste se o servidor da equipe usar outra porta.
@@ -48,7 +49,7 @@ export default function ListaUnidades() {
       if (busca) params.set("busca", busca);
       if (filtroStatus) params.set("status", filtroStatus);
 
-      const resp = await fetch(`${API}?${params}`);
+      const resp = await authFetch(`${API}?${params}`);
       if (!resp.ok) throw new Error("Não foi possível carregar as unidades.");
       setUnidades(await resp.json());
     } catch (e) {
@@ -97,7 +98,7 @@ export default function ListaUnidades() {
     e.preventDefault();
     setErro("");
     try {
-      const resp = await fetch(editandoId ? `${API}/${editandoId}` : API, {
+      const resp = await authFetch(editandoId ? `${API}/${editandoId}` : API, {
         method: editandoId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -116,7 +117,7 @@ export default function ListaUnidades() {
   async function excluir(unidade: Unidade) {
     if (!window.confirm(`Excluir a unidade "${unidade.nome}"?`)) return;
     try {
-      const resp = await fetch(`${API}/${unidade.id}`, { method: "DELETE" });
+      const resp = await authFetch(`${API}/${unidade.id}`, { method: "DELETE" });
       if (!resp.ok) throw new Error("Erro ao excluir a unidade.");
       carregar();
     } catch (e) {

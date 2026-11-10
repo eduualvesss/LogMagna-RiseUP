@@ -5,7 +5,7 @@ import type { ReactNode, ChangeEvent, CSSProperties } from 'react';
 import { Spinner, Skeleton, TableSkeleton, PageSkeleton } from './components/Loading';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { clearSession, useRequireAuth } from './lib/auth';
+import { authFetch, clearSession, useRequireAuth } from './lib/auth';
 import type { User } from './lib/auth';
 import {
   LayoutDashboard, ShieldCheck, PackageSearch, PlusCircle,
@@ -236,7 +236,7 @@ export const Services = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/products')
+    authFetch('http://localhost:3001/api/products')
       .then(res => res.json())
       .then(data => setProducts(Array.isArray(data) ? data : []))
       .catch((err: Error) => console.error(err))
@@ -450,7 +450,7 @@ export const AddProduct = () => {
   const submit = () => {
     setMsg('');
     setSubmitting(true);
-    fetch('http://localhost:3001/api/products', {
+    authFetch('http://localhost:3001/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...form, value: num }),

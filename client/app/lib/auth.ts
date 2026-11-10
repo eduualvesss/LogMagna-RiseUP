@@ -56,6 +56,19 @@ export function clearSession() {
   sessionStorage.removeItem(STORAGE_KEY);
 }
 
+/** fetch com o token da sessao; se o servidor responder 401, encerra a sessao e volta ao login. */
+export async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const session = getSession();
+  const headers = new Headers(init.headers);
+  if (session) headers.set('Authorization', `Bearer ${session.token}`);
+  const res = await fetch(input, { ...init, headers });
+  if (res.status === 401 && typeof window !== 'undefined') {
+    clearSession();
+    window.location.assign('/login');
+  }
+  return res;
+}
+
 /** Valida a sessao no servidor; limpa se expirou. */
 async function validate(session: Session): Promise<User | null> {
   try {
