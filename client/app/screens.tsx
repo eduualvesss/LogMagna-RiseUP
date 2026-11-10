@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import type { ReactNode, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -10,10 +11,38 @@ import {
 } from 'lucide-react';
 import boxesImg from './assets/boxes.jpg';
 
+// --- TIPOS ---
+
+interface Product {
+  id: string;
+  name: string;
+  value: number;
+  cost: number;
+  status: string;
+}
+
+interface TrackingEvent {
+  status: string;
+  location: string;
+  date: string;
+  current?: boolean;
+}
+
+interface TrackingData {
+  id: string;
+  name: string;
+  origin: string;
+  destination: string;
+  value: number;
+  history: TrackingEvent[];
+}
+
+type ProductForm = { name: string; value: string; store: string; tracking: string };
+
 // --- COMPONENTES VISUAIS ---
 
 // Logo SVG (Fundo transparente, cores corrigidas)
-const Logo = ({ className = "w-10 h-10 text-[#3f6b4d]" }) => (
+const Logo = ({ className = "w-10 h-10 text-[#3f6b4d]" }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
     <path d="M70 14 A38 38 0 1 0 70 86" />
     <path d="M36 33 H66 L61 56 M63 38 H77 C84 38 88 44 88 49 L85 58 H82 M36 58 H62" />
@@ -74,7 +103,7 @@ const Sidebar = () => {
   );
 };
 
-const TopBar = ({ title, subtitle }) => (
+const TopBar = ({ title }: { title: string; subtitle?: string }) => (
   <header className="bg-[#1a3326] h-16 flex items-center justify-between px-8 text-white sticky top-0 z-10">
     <div className="flex items-center gap-2 text-sm text-gray-300">
       <span>Área do cliente</span>
@@ -87,7 +116,7 @@ const TopBar = ({ title, subtitle }) => (
   </header>
 );
 
-const Layout = ({ children, title }) => (
+const Layout = ({ children, title }: { children: ReactNode; title: string }) => (
   <div className="flex bg-[#f4f6f5] min-h-screen">
     <Sidebar />
     <div className="ml-64 flex-1 flex flex-col">
@@ -183,13 +212,13 @@ export const Dashboard = () => (
 );
 
 export const Services = () => {
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     fetch('http://localhost:3001/api/products')
       .then(res => res.json())
       .then(data => setProducts(Array.isArray(data) ? data : []))
-      .catch(err => console.error(err));
+      .catch((err: Error) => console.error(err));
   }, []);
 
   return (
@@ -271,7 +300,7 @@ export const Services = () => {
 
 export const Tracking = () => {
   const [code, setCode] = useState('BR123456789SP');
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<TrackingData | null>(null);
   const [error, setError] = useState('');
 
   const handleSearch = () => {
@@ -282,7 +311,7 @@ export const Tracking = () => {
         if (!res.ok) throw new Error(json.error || 'Erro ao rastrear.');
         setData(json);
       })
-      .catch(err => { setData(null); setError(err.message); });
+      .catch((err: Error) => { setData(null); setError(err.message); });
   };
 
   useEffect(() => { handleSearch(); // eslint-disable-next-line
@@ -372,9 +401,9 @@ export const Tracking = () => {
 };
 
 export const AddProduct = () => {
-  const [form, setForm] = useState({ name: 'Mouse Logitech MX Master 3S', value: '350', store: 'Loja Exemplo', tracking: '' });
+  const [form, setForm] = useState<ProductForm>({ name: 'Mouse Logitech MX Master 3S', value: '350', store: 'Loja Exemplo', tracking: '' });
   const [msg, setMsg] = useState('');
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const set = (k: keyof ProductForm) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
   const num = Number(String(form.value).replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
   const brl = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -390,7 +419,7 @@ export const AddProduct = () => {
         if (!res.ok) throw new Error(json.error);
         setMsg(`Produto ${json.id} cadastrado com sucesso (demo).`);
       })
-      .catch(err => setMsg(err.message || 'Falha ao cadastrar.'));
+      .catch((err: Error) => setMsg(err.message || 'Falha ao cadastrar.'));
   };
 
   return (
