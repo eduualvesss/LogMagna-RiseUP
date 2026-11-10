@@ -113,7 +113,7 @@ export default function ListaUnidades() {
     <section className="unidades">
       <header className="unidades__topo">
         <h1>Unidades</h1>
-        <button className="btn btn--primario" onClick={abrirNovo}>
+        <button className="unidades-btn unidades-btn--primario" onClick={abrirNovo}>
           Nova unidade
         </button>
       </header>
@@ -189,10 +189,10 @@ export default function ListaUnidades() {
           </label>
 
           <div className="unidades__acoes-form">
-            <button type="button" className="btn" onClick={fecharForm}>
+            <button type="button" className="unidades-btn" onClick={fecharForm}>
               Cancelar
             </button>
-            <button type="submit" className="btn btn--primario">
+            <button type="submit" className="unidades-btn unidades-btn--primario">
               Salvar
             </button>
           </div>
@@ -226,15 +226,15 @@ export default function ListaUnidades() {
                   <td>{u.cidade}</td>
                   <td>{u.estado}</td>
                   <td>
-                    <span className={`selo selo--${u.status}`}>
+                    <span className={`unidades-selo unidades-selo--${u.status}`}>
                       {u.status === "ativa" ? "Ativa" : "Inativa"}
                     </span>
                   </td>
                   <td className="unidades__acoes">
-                    <button className="btn btn--link" onClick={() => abrirEdicao(u)}>
+                    <button className="unidades-btn unidades-btn--link" onClick={() => abrirEdicao(u)}>
                       Editar
                     </button>
-                    <button className="btn btn--link btn--perigo" onClick={() => excluir(u)}>
+                    <button className="unidades-btn unidades-btn--link unidades-btn--perigo" onClick={() => excluir(u)}>
                       Excluir
                     </button>
                   </td>

@@ -15,7 +15,9 @@ const TIPOS = ["Matriz", "Filial", "Centro de distribuição"];
 const STATUS = ["ativa", "inativa"];
 
 function validar(corpo) {
-  const { nome, tipo, cidade, estado, status } = corpo;
+  const { nome, tipo, cidade, estado, status } = corpo || {};
+  const textos = [nome, cidade, estado];
+  if (textos.some((v) => typeof v !== "string")) return "Nome, cidade e estado devem ser texto.";
   if (!nome || !nome.trim()) return "O nome é obrigatório.";
   if (!TIPOS.includes(tipo)) return "Tipo inválido.";
   if (!cidade || !cidade.trim()) return "A cidade é obrigatória.";
@@ -26,7 +28,8 @@ function validar(corpo) {
 
 // GET /api/unidades?busca=recife&status=ativa
 router.get("/", (req, res) => {
-  const { busca = "", status = "" } = req.query;
+  const busca = typeof req.query.busca === "string" ? req.query.busca : "";
+  const status = typeof req.query.status === "string" ? req.query.status : "";
   const termo = busca.toLowerCase();
 
   const resultado = unidades.filter((u) => {

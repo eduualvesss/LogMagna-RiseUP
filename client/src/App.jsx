@@ -6,7 +6,7 @@ import {
   Laptop, Headphones, Camera, Leaf, ChevronRight
 } from 'lucide-react';
 import boxesImg from './assets/boxes.jpg';
-import ListaUnidades from './assets/ListaUnidades';
+import ListaUnidades from './components/ListaUnidades';
 
 // --- COMPONENTES VISUAIS ---
 
@@ -28,7 +28,7 @@ const Sidebar = () => {
     { path: '/services', label: 'Serviços contratados', icon: ShieldCheck },
     { path: '/tracking', label: 'Rastrear encomenda', icon: PackageSearch },
     { path: '/add', label: 'Cadastrar produto', icon: PlusCircle },
-     { path: '/unidades', label: 'Unidades', icon: Box },
+    { path: '/unidades', label: 'Unidades', icon: Box },
   ];
 
   return (
