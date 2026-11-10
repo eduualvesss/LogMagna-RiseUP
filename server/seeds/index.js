@@ -1,4 +1,4 @@
-﻿// Seeds deterministicas para mockar o sistema.
+// Seeds deterministicas para mockar o sistema.
 // Mesma SEED => mesmos dados em toda execucao (mude com SEED=123 npm run dev).
 const SEED = Number(process.env.SEED) || 2026;
 
@@ -88,4 +88,23 @@ const unidades = [
   })),
 ];
 
-module.exports = { RATE, products, history, unidades };
+// Usuarios de demonstracao (senha: logmagna123). Hash scrypt com salt fixo da seed.
+const crypto = require('crypto');
+const hash = (senha, salt) => crypto.scryptSync(senha, salt, 32).toString('hex');
+const criarUsuario = (id, nome, email, papel, senha) => {
+  const salt = `lm-seed-${id}`;
+  const senhaHash = hash(senha, salt);
+  return {
+    id, nome, email, papel,
+    checkPassword: (tentativa) => {
+      const a = Buffer.from(hash(tentativa, salt), 'hex');
+      return crypto.timingSafeEqual(a, Buffer.from(senhaHash, 'hex'));
+    },
+  };
+};
+const users = [
+  criarUsuario(1, 'Administrador LogMagna', 'admin@logmagna.com', 'admin', 'logmagna123'),
+  criarUsuario(2, 'Cliente Demonstração', 'cliente@logmagna.com', 'cliente', 'logmagna123'),
+];
+
+module.exports = { RATE, products, history, unidades, users };

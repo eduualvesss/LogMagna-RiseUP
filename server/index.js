@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const rotasUnidades = require('./unidades');
+const rotasAuth = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -11,6 +12,7 @@ app.use(express.json());
 // Latencia simulada para exibir loadings no front (MOCK_DELAY_MS=0 desativa).
 const MOCK_DELAY_MS = Number(process.env.MOCK_DELAY_MS ?? 600);
 app.use('/api', (req, res, next) => setTimeout(next, MOCK_DELAY_MS));
+app.use('/api/auth', rotasAuth);
 app.use('/api/unidades', rotasUnidades);
 
 const { RATE, products, history } = require('./seeds');

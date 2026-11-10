@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import type { ReactNode, ChangeEvent, CSSProperties } from 'react';
-import { Spinner, Skeleton, TableSkeleton } from './components/Loading';
+import { Spinner, Skeleton, TableSkeleton, PageSkeleton } from './components/Loading';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { clearSession, useRequireAuth } from './lib/auth';
+import type { User } from './lib/auth';
 import {
   LayoutDashboard, ShieldCheck, PackageSearch, PlusCircle,
   Truck, Box, CheckCircle, Clock, Info, ArrowRight, Search,
-  Laptop, Headphones, Camera, Leaf, ChevronRight
+  Laptop, Headphones, Camera, Leaf, ChevronRight, LogOut
 } from 'lucide-react';
 import boxesImg from './assets/boxes.jpg';
 
@@ -43,7 +45,7 @@ type ProductForm = { name: string; value: string; store: string; tracking: strin
 // --- COMPONENTES VISUAIS ---
 
 // Logo SVG (Fundo transparente, cores corrigidas)
-const Logo = ({ className = "w-10 h-10 text-[#3f6b4d]" }: { className?: string }) => (
+export const Logo = ({ className = "w-10 h-10 text-[#3f6b4d]" }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
     <path d="M70 14 A38 38 0 1 0 70 86" />
     <path d="M36 33 H66 L61 56 M63 38 H77 C84 38 88 44 88 49 L85 58 H82 M36 58 H62" />
@@ -105,24 +107,39 @@ const Sidebar = () => {
   );
 };
 
-const TopBar = ({ title }: { title: string; subtitle?: string }) => (
-  <header className="bg-[#1a3326] h-16 flex items-center justify-between px-8 text-white sticky top-0 z-10">
-    <div className="flex items-center gap-2 text-sm text-gray-300">
-      <span>Área do cliente</span>
-      <span>/</span>
-      <span className="text-white font-medium">{title}</span>
-    </div>
-    <div className="flex items-center gap-4">
-      <span className="px-3 py-1 bg-[#2d4a3e] rounded-full text-xs border border-gray-600">Ambiente de demonstração</span>
-    </div>
-  </header>
-);
+const TopBar = ({ title, user }: { title: string; user: User }) => {
+  const router = useRouter();
+  const sair = () => {
+    clearSession();
+    router.replace('/login');
+  };
 
-export const Layout = ({ children, title }: { children: ReactNode; title: string }) => (
+  return (
+    <header className="bg-[#1a3326] h-16 flex items-center justify-between px-8 text-white sticky top-0 z-10">
+      <div className="flex items-center gap-2 text-sm text-gray-300">
+        <span>Área do cliente</span>
+        <span>/</span>
+        <span className="text-white font-medium">{title}</span>
+      </div>
+      <div className="flex items-center gap-4">
+        <span className="px-3 py-1 bg-[#2d4a3e] rounded-full text-xs border border-gray-600">Ambiente de demonstração</span>
+        <span className="text-sm text-gray-200 hidden md:inline">{user.nome}</span>
+        <button onClick={sair} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-gray-600 hover:bg-white/10 transition">
+          <LogOut size={16} /> Sair
+        </button>
+      </div>
+    </header>
+  );
+};
+export const Layout = ({ children, title }: { children: ReactNode; title: string }) => {
+  const user = useRequireAuth();
+  if (!user) return <PageSkeleton />;
+
+  return (
   <div className="flex bg-[#f4f6f5] min-h-screen">
     <Sidebar />
     <div className="ml-64 flex-1 flex flex-col">
-      <TopBar title={title} />
+      <TopBar title={title} user={user} />
       <main className="p-8 flex-1 overflow-y-auto animate-fade-in-up">
         {children}
       </main>
@@ -131,7 +148,8 @@ export const Layout = ({ children, title }: { children: ReactNode; title: string
       </footer>
     </div>
   </div>
-);
+  );
+};
 
 // --- PÁGINAS ---
 
@@ -588,7 +606,7 @@ export const LandingPage = () => (
         <a href="#" className="hover:text-gray-300">Sobre a LogMagna</a>
       </div>
       <div className="flex gap-3">
-        <Link href="/dashboard" className="px-4 py-2 border border-gray-600 rounded-lg hover:bg-white/10 transition">Área do cliente</Link>
+        <Link href="/login" className="px-4 py-2 border border-gray-600 rounded-lg hover:bg-white/10 transition">Entrar</Link>
         <Link href="/add" className="px-4 py-2 bg-[#4a6b56] rounded-lg hover:bg-[#5c826a] transition">Criar cadastro</Link>
       </div>
     </nav>
