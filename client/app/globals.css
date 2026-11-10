@@ -14,3 +14,50 @@ body {
 #root {
   min-height: 100svh;
 }
+
+/* --- Animacoes e loadings --- */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in { animation: fade-in 0.4s ease both; }
+.animate-fade-in-up { animation: fade-in-up 0.5s ease both; }
+.animate-pop-in { animation: pop-in 0.3s ease both; }
+.animate-spin-slow { animation: spin 0.8s linear infinite; }
+
+/* Entrada escalonada: defina --i em cada item (style={{ '--i': index }}) */
+.stagger { animation: fade-in-up 0.45s ease both; animation-delay: calc(var(--i, 0) * 70ms); }
+
+.skeleton {
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e5e9e7 25%, #f3f5f4 50%, #e5e9e7 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgb(26 51 38 / 0.12); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in, .animate-fade-in-up, .animate-pop-in, .stagger, .skeleton, .animate-spin-slow {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+  }
+}

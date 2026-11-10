@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { ReactNode, ChangeEvent } from 'react';
+import type { ReactNode, ChangeEvent, CSSProperties } from 'react';
+import { Spinner, Skeleton, TableSkeleton } from './components/Loading';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -122,7 +123,7 @@ export const Layout = ({ children, title }: { children: ReactNode; title: string
     <Sidebar />
     <div className="ml-64 flex-1 flex flex-col">
       <TopBar title={title} />
-      <main className="p-8 flex-1 overflow-y-auto">
+      <main className="p-8 flex-1 overflow-y-auto animate-fade-in-up">
         {children}
       </main>
       <footer className="p-6 text-center text-xs text-gray-500 border-t border-gray-200 bg-white">
@@ -214,13 +215,19 @@ export const Dashboard = () => (
 
 export const Services = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('http://localhost:3001/api/products')
       .then(res => res.json())
       .then(data => setProducts(Array.isArray(data) ? data : []))
-      .catch((err: Error) => console.error(err));
+      .catch((err: Error) => console.error(err))
+      .finally(() => setLoading(false));
   }, []);
+
+  const totalValor = products.reduce((s, p) => s + p.value, 0);
+  const totalCusto = products.reduce((s, p) => s + p.cost, 0);
+  const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <Layout title="Serviços contratados">
@@ -236,18 +243,18 @@ export const Services = () => {
 
       <div className="bg-[#e8f0eb] p-4 rounded-xl flex justify-between items-center mb-6 border border-green-100">
         <div className="flex items-center gap-2 text-[#1a3326] font-medium">
-          <ShieldCheck size={20} /> 3 serviços ativos na demonstração
+          <ShieldCheck size={20} /> {loading ? <Skeleton className="h-5 w-48" /> : `${products.length} serviços ativos na demonstração`}
         </div>
         <div className="text-sm text-gray-600">
-          Produtos: <span className="font-bold">R$ 8.000,00</span> • Custo: <span className="font-bold">R$ 160,00</span>
+          {loading ? <Skeleton className="h-5 w-56" /> : <>Produtos: <span className="font-bold">{brl(totalValor)}</span> • Custo: <span className="font-bold">{brl(totalCusto)}</span></>}
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-8">
         <div className="p-4 border-b border-gray-100 flex justify-between items-center">
           <div className="flex gap-4 text-sm font-medium text-gray-500">
-            <button className="text-[#1a3326] border-b-2 border-[#1a3326] pb-1">Todos (3)</button>
-            <button className="hover:text-gray-900">Ativos (3)</button>
+            <button className="text-[#1a3326] border-b-2 border-[#1a3326] pb-1">Todos ({products.length})</button>
+            <button className="hover:text-gray-900">Ativos ({products.filter(p => p.status !== 'Entregue').length})</button>
             <button className="hover:text-gray-900">Arquivados (0)</button>
           </div>
           <div className="relative">
@@ -266,9 +273,9 @@ export const Services = () => {
               <th className="p-4"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {products.map(p => (
-              <tr key={p.id} className="hover:bg-gray-50 transition">
+          {loading ? <TableSkeleton rows={5} cols={5} /> : <tbody className="divide-y divide-gray-100">
+            {products.map((p, i) => (
+              <tr key={p.id} style={{ '--i': i } as CSSProperties} className="stagger hover:bg-gray-50 transition">
                 <td className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-gray-100 rounded-lg text-gray-600">
@@ -292,7 +299,7 @@ export const Services = () => {
                 <td className="p-4 text-right"><ChevronRight size={16} className="text-gray-400" /></td>
               </tr>
             ))}
-          </tbody>
+          </tbody>}
         </table>
       </div>
     </Layout>
@@ -303,16 +310,19 @@ export const Tracking = () => {
   const [code, setCode] = useState('BR123456789SP');
   const [data, setData] = useState<TrackingData | null>(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSearch = () => {
     setError('');
+    setLoading(true);
     fetch(`http://localhost:3001/api/tracking/${encodeURIComponent(code.trim())}`)
       .then(async res => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Erro ao rastrear.');
         setData(json);
       })
-      .catch((err: Error) => { setData(null); setError(err.message); });
+      .catch((err: Error) => { setData(null); setError(err.message); })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { handleSearch(); // eslint-disable-next-line
@@ -339,16 +349,26 @@ export const Tracking = () => {
           </div>
         </div>
         <div className="flex items-end">
-          <button onClick={handleSearch} className="bg-[#1a3326] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#2d4a3e] flex items-center gap-2 h-[46px]">
-            <ArrowRight size={18} /> Rastrear encomenda
+          <button onClick={handleSearch} disabled={loading} className="bg-[#1a3326] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#2d4a3e] disabled:opacity-70 disabled:cursor-wait transition flex items-center gap-2 h-[46px]">
+            {loading ? <Spinner /> : <ArrowRight size={18} />} {loading ? 'Rastreando...' : 'Rastrear encomenda'}
           </button>
         </div>
       </div>
 
       {error && <div className="mb-6 p-4 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>}
 
-      {data && (
-        <div className="grid grid-cols-3 gap-6">
+      {loading && (
+        <div className="grid grid-cols-3 gap-6" aria-busy="true">
+          <div className="col-span-2 space-y-6">
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-72 w-full" />
+          </div>
+          <Skeleton className="h-72 w-full" />
+        </div>
+      )}
+
+      {!loading && data && (
+        <div className="grid grid-cols-3 gap-6 animate-fade-in-up">
           <div className="col-span-2 space-y-6">
             <div className="bg-[#e8f0eb] p-6 rounded-xl border border-green-100">
               <div className="flex items-center gap-3 mb-2">
@@ -363,7 +383,7 @@ export const Tracking = () => {
               <h3 className="font-bold text-lg mb-6">Histórico de movimentações</h3>
               <div className="space-y-8 relative pl-4 border-l-2 border-gray-100 ml-2">
                 {data.history.map((h, i) => (
-                  <div key={i} className="relative pl-6">
+                  <div key={i} style={{ '--i': i } as CSSProperties} className="stagger relative pl-6">
                     <div className={`absolute -left-[21px] top-1 w-4 h-4 rounded-full border-2 ${h.current ? 'bg-[#1a3326] border-[#1a3326]' : 'bg-white border-gray-300'}`}></div>
                     <div className="flex justify-between items-start">
                       <div>
@@ -404,12 +424,14 @@ export const Tracking = () => {
 export const AddProduct = () => {
   const [form, setForm] = useState<ProductForm>({ name: 'Mouse Logitech MX Master 3S', value: '350', store: 'Loja Exemplo', tracking: '' });
   const [msg, setMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const set = (k: keyof ProductForm) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
   const num = Number(String(form.value).replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
   const brl = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const submit = () => {
     setMsg('');
+    setSubmitting(true);
     fetch('http://localhost:3001/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -420,7 +442,8 @@ export const AddProduct = () => {
         if (!res.ok) throw new Error(json.error);
         setMsg(`Produto ${json.id} cadastrado com sucesso (demo).`);
       })
-      .catch((err: Error) => setMsg(err.message || 'Falha ao cadastrar.'));
+      .catch((err: Error) => setMsg(err.message || 'Falha ao cadastrar.'))
+      .finally(() => setSubmitting(false));
   };
 
   return (
@@ -504,11 +527,11 @@ export const AddProduct = () => {
           Estou ciente de que este cadastro é demonstrativo e não gera contratação real.
         </div>
 
-        {msg && <div className="p-3 rounded-lg bg-[#e8f0eb] text-[#1a3326] text-sm">{msg}</div>}
+        {msg && <div className="p-3 rounded-lg bg-[#e8f0eb] text-[#1a3326] text-sm animate-pop-in">{msg}</div>}
         <div className="flex justify-between pt-4">
           <Link href="/dashboard" className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">Cancelar</Link>
-          <button onClick={submit} className="px-6 py-2 bg-[#1a3326] text-white rounded-lg font-medium hover:bg-[#2d4a3e] flex items-center gap-2">
-            <CheckCircle size={18} /> Cadastrar produto (demo)
+          <button onClick={submit} disabled={submitting} className="px-6 py-2 bg-[#1a3326] text-white rounded-lg font-medium hover:bg-[#2d4a3e] disabled:opacity-70 disabled:cursor-wait transition flex items-center gap-2">
+            {submitting ? <Spinner /> : <CheckCircle size={18} />} {submitting ? 'Cadastrando...' : 'Cadastrar produto (demo)'}
           </button>
         </div>
       </div>
@@ -571,7 +594,7 @@ export const LandingPage = () => (
     </nav>
 
     <header className="max-w-6xl mx-auto px-8 py-20 grid grid-cols-2 gap-12 items-center">
-      <div>
+      <div className="animate-fade-in-up">
         <span className="bg-[#1a3326] text-white text-xs px-3 py-1 rounded-full uppercase tracking-wider font-bold">Suas compras, mais organizadas.</span>
         <h1 className="text-5xl font-bold text-[#1a3326] mt-6 mb-6 leading-tight">Mais cuidado com o que chega até você.</h1>
         <p className="text-gray-600 text-lg mb-8">Uma nova forma de gerenciar seguros de encomendas e compras online. Cadastre seus produtos, visualize seus serviços e acompanhe cada entrega em um só lugar.</p>
@@ -585,7 +608,7 @@ export const LandingPage = () => (
         </div>
         <p className="text-xs text-gray-400 mt-6 flex items-center gap-2"><Info size={14} /> Apresentação demonstrativa. Não comercializa seguros.</p>
       </div>
-      <div className="relative">
+      <div className="relative animate-pop-in" style={{ animationDelay: '150ms' }}>
         <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 absolute -bottom-10 -left-10 z-10 max-w-xs">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-green-50 rounded-lg text-[#1a3326]"><Box size={20} /></div>
@@ -611,7 +634,7 @@ export const LandingPage = () => (
             { icon: ShieldCheck, title: 'Organize seus serviços', desc: 'Consulte os registros de seguros e os valores ilustrativos em um painel simples.' },
             { icon: PackageSearch, title: 'Acompanhe o caminho', desc: 'Visualize o status do envio e o histórico de movimentações até a entrega.' }
           ].map((item, i) => (
-            <div key={i} className="relative">
+            <div key={i} style={{ '--i': i } as CSSProperties} className="stagger hover-lift relative">
               <span className="absolute -top-4 -right-2 text-6xl font-bold text-gray-100 -z-10">0{i + 1}</span>
               <item.icon size={32} className="text-[#1a3326] mb-4" />
               <h3 className="text-xl font-bold text-gray-900 mb-2">{item.title}</h3>

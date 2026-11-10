@@ -2,6 +2,7 @@
 
 import type { ChangeEvent, FormEvent } from 'react';
 import { useEffect, useState } from "react";
+import { Skeleton } from "./Loading";
 import "./ListaUnidades.css";
 
 // Ajuste se o servidor da equipe usar outra porta.
@@ -214,7 +215,7 @@ export default function ListaUnidades() {
       )}
 
       {carregando ? (
-        <p className="unidades__vazio">Carregando unidades...</p>
+        <div className="unidades__vazio" aria-busy="true" role="status">{[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full mb-3" />)}</div>
       ) : unidades.length === 0 ? (
         <p className="unidades__vazio">
           Nenhuma unidade encontrada. Ajuste a busca ou cadastre uma nova unidade.
@@ -234,7 +235,7 @@ export default function ListaUnidades() {
             </thead>
             <tbody>
               {unidades.map((u) => (
-                <tr key={u.id}>
+                <tr key={u.id} className="animate-fade-in-up">
                   <td>{u.nome}</td>
                   <td>{u.tipo}</td>
                   <td>{u.cidade}</td>
