@@ -59,6 +59,7 @@ const Sidebar = () => {
     { path: '/services', label: 'Serviços contratados', icon: ShieldCheck },
     { path: '/tracking', label: 'Rastrear encomenda', icon: PackageSearch },
     { path: '/add', label: 'Cadastrar produto', icon: PlusCircle },
+    { path: '/unidades', label: 'Unidades', icon: Box },
   ];
 
   return (
@@ -116,7 +117,7 @@ const TopBar = ({ title }: { title: string; subtitle?: string }) => (
   </header>
 );
 
-const Layout = ({ children, title }: { children: ReactNode; title: string }) => (
+export const Layout = ({ children, title }: { children: ReactNode; title: string }) => (
   <div className="flex bg-[#f4f6f5] min-h-screen">
     <Sidebar />
     <div className="ml-64 flex-1 flex flex-col">
@@ -632,4 +633,3 @@ export const LandingPage = () => (
     </footer>
   </div>
 );
-
