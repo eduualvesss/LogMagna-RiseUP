@@ -27,8 +27,15 @@ app.get('/api/products', requireAuth, (req, res) => res.json(products));
 app.post('/api/products', requireAuth, (req, res) => {
   const { name, value, store, destination, tracking, purchaseDate, cep } = req.body || {};
   const num = Number(value);
-  if (!name || !Number.isFinite(num) || num <= 0) {
+  if (typeof name !== 'string' || !name.trim() || !Number.isFinite(num) || num <= 0) {
     return res.status(400).json({ error: 'Nome e valor válidos são obrigatórios.' });
+  }
+  if (name.trim().length > 120) {
+    return res.status(400).json({ error: 'O nome do produto deve ter no máximo 120 caracteres.' });
+  }
+  const camposTexto = [name, store, destination, tracking, purchaseDate, cep].filter((v) => typeof v === 'string');
+  if (camposTexto.some((v) => /[<>]/.test(v))) {
+    return res.status(400).json({ error: 'Caracteres HTML (< ou >) não são permitidos.' });
   }
   const product = {
     id: `LM-2026-${String(products.length + 1).padStart(3, '0')}`,

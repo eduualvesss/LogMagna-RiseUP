@@ -3,20 +3,27 @@ const router = express.Router();
 const seed = require('./seeds');
 
 // Dados em memória vindos da seed (server/seeds). Troque por banco quando a equipe definir.
-let unidades = [...seed.unidades];
+let unidades = seed.unidades.map((u) => ({ ...u, version: u.version ?? 1 }));
 let proximoId = Math.max(...unidades.map((u) => u.id)) + 1;
 
 const TIPOS = ["Matriz", "Filial", "Centro de distribuição"];
 const STATUS = ["ativa", "inativa"];
+const TAG_HTML = /[<>]/;
 
 function validar(corpo) {
   const { nome, tipo, cidade, estado, status } = corpo || {};
   const textos = [nome, cidade, estado];
   if (textos.some((v) => typeof v !== "string")) return "Nome, cidade e estado devem ser texto.";
-  if (!nome || !nome.trim()) return "O nome é obrigatório.";
+  if (textos.some((v) => TAG_HTML.test(v))) return "Caracteres HTML (< ou >) não são permitidos.";
+  const nomeLimpo = nome.trim();
+  const cidadeLimpa = cidade.trim();
+  const ufLimpa = estado.trim();
+  if (!nomeLimpo) return "O nome é obrigatório.";
+  if (nomeLimpo.length > 120) return "O nome deve ter no máximo 120 caracteres.";
   if (!TIPOS.includes(tipo)) return "Tipo inválido.";
-  if (!cidade || !cidade.trim()) return "A cidade é obrigatória.";
-  if (!estado || estado.trim().length !== 2) return "Informe o estado com 2 letras (ex.: PE).";
+  if (!cidadeLimpa) return "A cidade é obrigatória.";
+  if (cidadeLimpa.length > 80) return "A cidade deve ter no máximo 80 caracteres.";
+  if (!/^[A-Za-z]{2}$/.test(ufLimpa)) return "Informe o estado com 2 letras válidas (ex.: PE).";
   if (!STATUS.includes(status)) return "Status inválido.";
   return null;
 }
@@ -59,6 +66,7 @@ router.post("/", (req, res) => {
     cidade: cidade.trim(),
     estado: estado.trim().toUpperCase(),
     status,
+    version: 1,
   };
   unidades.push(nova);
   res.status(201).json(nova);
@@ -72,14 +80,22 @@ router.put("/:id", (req, res) => {
   const erro = validar(req.body);
   if (erro) return res.status(400).json({ erro });
 
+  const atual = unidades[indice];
+  if (req.body.version !== undefined && Number(req.body.version) !== atual.version) {
+    return res.status(409).json({
+      erro: "Conflito de edição: esta unidade foi alterada por outro operador. Recarregue os dados.",
+    });
+  }
+
   const { nome, tipo, cidade, estado, status } = req.body;
   unidades[indice] = {
-    ...unidades[indice],
+    ...atual,
     nome: nome.trim(),
     tipo,
     cidade: cidade.trim(),
     estado: estado.trim().toUpperCase(),
     status,
+    version: (atual.version || 1) + 1,
   };
   res.json(unidades[indice]);
 });
