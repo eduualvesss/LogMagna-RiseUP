@@ -105,3 +105,29 @@ A API do servidor roda por padrão na porta `3001`:
   - Busca os dados e histórico de movimentações de um pacote pelo código de rastreio. Retorna `404` caso não encontrado.
 
 ---
+
+## ⚡ Como Rodar Rápido
+
+Todas as dependências do **Frontend** e do **Backend** já estão instaladas.
+
+### Opção 1: Atalho (1 clique)
+Dê um duplo clique no arquivo [`iniciar.bat`](file:///c:/Users/Eduardo/Desktop/codigo/Logmagna/iniciar.bat).
+
+### Opção 2: Terminal unificado (Frontend + Backend juntos)
+Na pasta `LogMagna-RiseUP`:
+```bash
+npm run dev
+```
+
+### Opção 3: Iniciar separadamente
+- **Backend (Porta 3001):**
+  ```bash
+  cd server
+  npm run dev
+  ```
+- **Frontend (Porta 5173):**
+  ```bash
+  cd client
+  npm run dev
+  ```
+

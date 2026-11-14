@@ -1,17 +1,60 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+'use client';
+
+import { useState, useEffect, createContext, useContext } from 'react';
+import type { ReactNode, ChangeEvent, CSSProperties } from 'react';
+import { Spinner, Skeleton, TableSkeleton, PageSkeleton } from './components/Loading';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { authFetch, clearSession, useRequireAuth } from './lib/auth';
+import { API_URL } from './lib/config';
+import type { User } from './lib/auth';
 import {
   LayoutDashboard, ShieldCheck, PackageSearch, PlusCircle,
   Truck, Box, CheckCircle, Clock, Info, ArrowRight, Search,
-  Laptop, Headphones, Camera, Leaf, ChevronRight
+  Laptop, Headphones, Camera, Leaf, ChevronRight, LogOut
 } from 'lucide-react';
 import boxesImg from './assets/boxes.jpg';
-import ListaUnidades from './components/ListaUnidades';
+
+// --- TIPOS ---
+
+interface Product {
+  id: string;
+  name: string;
+  value: number;
+  cost: number;
+  status: string;
+  tracking: string;
+  origin: string;
+  destination: string;
+}
+
+interface TrackingEvent {
+  status: string;
+  location: string;
+  date: string;
+  current?: boolean;
+}
+
+interface TrackingData {
+  id: string;
+  name: string;
+  origin: string;
+  destination: string;
+  value: number;
+  history: TrackingEvent[];
+}
+
+type ProductForm = { name: string; value: string; store: string; tracking: string; purchaseDate: string; cep: string; destination: string };
 
 // --- COMPONENTES VISUAIS ---
 
+const UserContext = createContext<User | null>(null);
+const useUser = () => useContext(UserContext);
+const iniciais = (nome: string) => nome.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+const saudacao = () => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; };
+
 // Logo SVG (Fundo transparente, cores corrigidas)
-const Logo = ({ className = "w-10 h-10 text-[#3f6b4d]" }) => (
+export const Logo = ({ className = "w-10 h-10 text-[#3f6b4d]" }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
     <path d="M70 14 A38 38 0 1 0 70 86" />
     <path d="M36 33 H66 L61 56 M63 38 H77 C84 38 88 44 88 49 L85 58 H82 M36 58 H62" />
@@ -22,7 +65,8 @@ const Logo = ({ className = "w-10 h-10 text-[#3f6b4d]" }) => (
 );
 
 const Sidebar = () => {
-  const location = useLocation();
+  const pathname = usePathname();
+  const user = useUser();
   const menuItems = [
     { path: '/dashboard', label: 'Visão geral', icon: LayoutDashboard },
     { path: '/services', label: 'Serviços contratados', icon: ShieldCheck },
@@ -41,11 +85,11 @@ const Sidebar = () => {
       <div className="px-4 mb-2 text-xs text-gray-400 uppercase font-semibold">Área do Cliente</div>
       <nav className="flex-1 px-4 space-y-2">
         {menuItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive = pathname === item.path;
           return (
             <Link
               key={item.path}
-              to={item.path}
+              href={item.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-[#2d4a3e] text-white' : 'text-gray-300 hover:bg-[#2d4a3e]/50'
                 }`}
             >
@@ -63,35 +107,51 @@ const Sidebar = () => {
       </div>
 
       <div className="p-4 border-t border-gray-700 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold">AS</div>
+        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold">{user ? iniciais(user.nome) : ''}</div>
         <div>
-          <p className="text-sm font-medium">Ana Silva</p>
-          <p className="text-xs text-gray-400">Conta demonstrativa</p>
+          <p className="text-sm font-medium">{user?.nome}</p>
+          <p className="text-xs text-gray-400 capitalize">{user?.papel} • demonstração</p>
         </div>
       </div>
     </aside>
   );
 };
 
-const TopBar = ({ title, subtitle }) => (
-  <header className="bg-[#1a3326] h-16 flex items-center justify-between px-8 text-white sticky top-0 z-10">
-    <div className="flex items-center gap-2 text-sm text-gray-300">
-      <span>Área do cliente</span>
-      <span>/</span>
-      <span className="text-white font-medium">{title}</span>
-    </div>
-    <div className="flex items-center gap-4">
-      <span className="px-3 py-1 bg-[#2d4a3e] rounded-full text-xs border border-gray-600">Ambiente de demonstração</span>
-    </div>
-  </header>
-);
+const TopBar = ({ title, user }: { title: string; user: User }) => {
+  const router = useRouter();
+  const sair = () => {
+    clearSession();
+    router.replace('/login');
+  };
 
-const Layout = ({ children, title }) => (
+  return (
+    <header className="bg-[#1a3326] h-16 flex items-center justify-between px-8 text-white sticky top-0 z-10">
+      <div className="flex items-center gap-2 text-sm text-gray-300">
+        <span>Área do cliente</span>
+        <span>/</span>
+        <span className="text-white font-medium">{title}</span>
+      </div>
+      <div className="flex items-center gap-4">
+        <span className="px-3 py-1 bg-[#2d4a3e] rounded-full text-xs border border-gray-600">Ambiente de demonstração</span>
+        <span className="text-sm text-gray-200 hidden md:inline">{user.nome}</span>
+        <button onClick={sair} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-gray-600 hover:bg-white/10 transition">
+          <LogOut size={16} /> Sair
+        </button>
+      </div>
+    </header>
+  );
+};
+export const Layout = ({ children, title }: { children: ReactNode; title: string }) => {
+  const user = useRequireAuth();
+  if (!user) return <PageSkeleton />;
+
+  return (
+  <UserContext.Provider value={user}>
   <div className="flex bg-[#f4f6f5] min-h-screen">
     <Sidebar />
     <div className="ml-64 flex-1 flex flex-col">
-      <TopBar title={title} />
-      <main className="p-8 flex-1 overflow-y-auto">
+      <TopBar title={title} user={user} />
+      <main className="p-8 flex-1 overflow-y-auto animate-fade-in-up">
         {children}
       </main>
       <footer className="p-6 text-center text-xs text-gray-500 border-t border-gray-200 bg-white">
@@ -99,18 +159,41 @@ const Layout = ({ children, title }) => (
       </footer>
     </div>
   </div>
-);
+  </UserContext.Provider>
+  );
+};
 
 // --- PÁGINAS ---
 
-const Dashboard = () => (
-  <Layout title="Visão geral">
+const DashboardContent = () => {
+  const user = useUser();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    authFetch(`${API_URL}/products`)
+      .then(res => res.json())
+      .then(data => setProducts(Array.isArray(data) ? data : []))
+      .catch((err: Error) => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const totalValor = products.reduce((t, p) => t + p.value, 0);
+  const totalCusto = products.reduce((t, p) => t + p.cost, 0);
+  const emTransito = products.filter(p => p.status === 'Em trânsito');
+  const aguardando = products.filter(p => p.status === 'Aguardando');
+  const pendentes = [...emTransito, ...aguardando];
+  const proxima = emTransito[0] ?? aguardando[0];
+
+  return (
+    <>
     <div className="mb-8 flex justify-between items-end">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Bom dia, Ana.</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{saudacao()}, {user?.nome.split(' ')[0]}.</h1>
         <p className="text-gray-500 mt-1">Suas compras e encomendas, com uma visão mais tranquila.</p>
       </div>
-      <Link to="/add" className="bg-[#1a3326] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#2d4a3e] transition">
+      <Link href="/add" className="bg-[#1a3326] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#2d4a3e] transition">
         <PlusCircle size={18} /> Cadastrar produto
       </Link>
     </div>
@@ -118,17 +201,17 @@ const Dashboard = () => (
     {/* Stats Cards */}
     <div className="grid grid-cols-4 gap-6 mb-8">
       {[
-        { label: 'Serviços ativos', value: '3', sub: 'Registros demonstrativos', icon: ShieldCheck },
-        { label: 'Valor dos produtos', value: 'R$ 8.000,00', sub: 'Soma dos 3 produtos', icon: Box },
-        { label: 'Entregas pendentes', value: '2', sub: '1 em trânsito • 1 aguardando', icon: Truck },
-        { label: 'Custo simulado', value: 'R$ 160,00', sub: 'Total por envio • sem cobrança', icon: PackageSearch },
+        { label: 'Serviços ativos', value: String(products.length), sub: 'Registros demonstrativos', icon: ShieldCheck },
+        { label: 'Valor dos produtos', value: brl(totalValor), sub: `Soma dos ${products.length} produtos`, icon: Box },
+        { label: 'Entregas pendentes', value: String(pendentes.length), sub: `${emTransito.length} em trânsito • ${aguardando.length} aguardando`, icon: Truck },
+        { label: 'Custo simulado', value: brl(totalCusto), sub: 'Total por envio • sem cobrança', icon: PackageSearch },
       ].map((stat, i) => (
         <div key={i} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <span className="text-sm text-gray-500 font-medium">{stat.label}</span>
             <stat.icon size={20} className="text-gray-400" />
           </div>
-          <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
+          <div className="text-3xl font-bold text-gray-900 mb-1">{loading ? <Skeleton className="h-9 w-32" /> : stat.value}</div>
           <div className="text-xs text-gray-400">{stat.sub}</div>
         </div>
       ))}
@@ -139,22 +222,22 @@ const Dashboard = () => (
       <div className="col-span-2 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-bold text-lg text-gray-900">Sua próxima entrega</h3>
-          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">Em trânsito</span>
+          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">{proxima?.status ?? '—'}</span>
         </div>
 
         <div className="flex items-center gap-4 mb-6">
           <div className="p-3 bg-gray-50 rounded-lg"><Laptop size={24} className="text-gray-600" /></div>
           <div>
-            <h4 className="font-bold text-gray-900">Notebook Dell Inspiron</h4>
-            <p className="text-xs text-gray-500">LM-2026-001 • BR123456789SP</p>
+            <h4 className="font-bold text-gray-900">{loading ? 'Carregando...' : proxima?.name ?? 'Nenhuma entrega em andamento'}</h4>
+            <p className="text-xs text-gray-500">{proxima ? `${proxima.id} • ${proxima.tracking}` : ''}</p>
           </div>
         </div>
 
         <div className="relative flex items-center justify-between mb-6 px-4">
           <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-200 -z-10"></div>
-          <div className="bg-white px-2 text-sm font-medium text-gray-700">Campinas, SP</div>
+          <div className="bg-white px-2 text-sm font-medium text-gray-700">{proxima?.origin ?? '—'}</div>
           <Truck size={20} className="text-[#1a3326] bg-white p-1 rounded-full" />
-          <div className="bg-white px-2 text-sm font-medium text-gray-700">São Paulo, SP</div>
+          <div className="bg-white px-2 text-sm font-medium text-gray-700">{proxima?.destination ?? '—'}</div>
         </div>
 
         <div className="flex justify-between items-center pt-4 border-t border-gray-100">
@@ -162,7 +245,7 @@ const Dashboard = () => (
             <p className="text-xs text-gray-500">Previsão de entrega</p>
             <p className="font-bold text-gray-900">08 de outubro de 2026</p>
           </div>
-          <Link to="/tracking" className="border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
+          <Link href="/tracking" className="border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
             Ver rastreio <ArrowRight size={16} />
           </Link>
         </div>
@@ -173,23 +256,36 @@ const Dashboard = () => (
         <Leaf size={32} className="text-[#1a3326] mb-4" />
         <h3 className="text-xl font-bold text-[#1a3326] mb-2">Uma nova compra?<br />Comece por aqui.</h3>
         <p className="text-sm text-gray-600 mb-6">Adicione seu produto e confira o resumo de valores antes de concluir o cadastro demonstrativo.</p>
-        <Link to="/add" className="bg-[#1a3326] text-white px-4 py-3 rounded-lg text-center font-medium hover:bg-[#2d4a3e] transition flex items-center justify-center gap-2">
+        <Link href="/add" className="bg-[#1a3326] text-white px-4 py-3 rounded-lg text-center font-medium hover:bg-[#2d4a3e] transition flex items-center justify-center gap-2">
           <PlusCircle size={18} /> Cadastrar novo produto
         </Link>
       </div>
     </div>
+    </>
+  );
+};
+
+export const Dashboard = () => (
+  <Layout title="Visão geral">
+    <DashboardContent />
   </Layout>
 );
 
-const Services = () => {
-  const [products, setProducts] = useState([]);
+export const Services = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/products')
+    authFetch(`${API_URL}/products`)
       .then(res => res.json())
       .then(data => setProducts(Array.isArray(data) ? data : []))
-      .catch(err => console.error(err));
+      .catch((err: Error) => console.error(err))
+      .finally(() => setLoading(false));
   }, []);
+
+  const totalValor = products.reduce((s, p) => s + p.value, 0);
+  const totalCusto = products.reduce((s, p) => s + p.cost, 0);
+  const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <Layout title="Serviços contratados">
@@ -198,25 +294,25 @@ const Services = () => {
           <h1 className="text-3xl font-bold text-gray-900">Serviços contratados</h1>
           <p className="text-gray-500 mt-1">Consulte seus produtos e os registros de seguros demonstrativos.</p>
         </div>
-        <Link to="/add" className="bg-[#1a3326] text-white px-4 py-2 rounded-lg flex items-center gap-2">
+        <Link href="/add" className="bg-[#1a3326] text-white px-4 py-2 rounded-lg flex items-center gap-2">
           <PlusCircle size={18} /> Cadastrar produto
         </Link>
       </div>
 
       <div className="bg-[#e8f0eb] p-4 rounded-xl flex justify-between items-center mb-6 border border-green-100">
         <div className="flex items-center gap-2 text-[#1a3326] font-medium">
-          <ShieldCheck size={20} /> 3 serviços ativos na demonstração
+          <ShieldCheck size={20} /> {loading ? <Skeleton className="h-5 w-48" /> : `${products.length} serviços ativos na demonstração`}
         </div>
         <div className="text-sm text-gray-600">
-          Produtos: <span className="font-bold">R$ 8.000,00</span> • Custo: <span className="font-bold">R$ 160,00</span>
+          {loading ? <Skeleton className="h-5 w-56" /> : <>Produtos: <span className="font-bold">{brl(totalValor)}</span> • Custo: <span className="font-bold">{brl(totalCusto)}</span></>}
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-8">
         <div className="p-4 border-b border-gray-100 flex justify-between items-center">
           <div className="flex gap-4 text-sm font-medium text-gray-500">
-            <button className="text-[#1a3326] border-b-2 border-[#1a3326] pb-1">Todos (3)</button>
-            <button className="hover:text-gray-900">Ativos (3)</button>
+            <button className="text-[#1a3326] border-b-2 border-[#1a3326] pb-1">Todos ({products.length})</button>
+            <button className="hover:text-gray-900">Ativos ({products.filter(p => p.status !== 'Entregue').length})</button>
             <button className="hover:text-gray-900">Arquivados (0)</button>
           </div>
           <div className="relative">
@@ -235,9 +331,9 @@ const Services = () => {
               <th className="p-4"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {products.map(p => (
-              <tr key={p.id} className="hover:bg-gray-50 transition">
+          {loading ? <TableSkeleton rows={5} cols={5} /> : <tbody className="divide-y divide-gray-100">
+            {products.map((p, i) => (
+              <tr key={p.id} style={{ '--i': i } as CSSProperties} className="stagger hover:bg-gray-50 transition">
                 <td className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-gray-100 rounded-lg text-gray-600">
@@ -261,27 +357,30 @@ const Services = () => {
                 <td className="p-4 text-right"><ChevronRight size={16} className="text-gray-400" /></td>
               </tr>
             ))}
-          </tbody>
+          </tbody>}
         </table>
       </div>
     </Layout>
   );
 };
 
-const Tracking = () => {
+export const Tracking = () => {
   const [code, setCode] = useState('BR123456789SP');
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<TrackingData | null>(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSearch = () => {
     setError('');
-    fetch(`http://localhost:3001/api/tracking/${encodeURIComponent(code.trim())}`)
+    setLoading(true);
+    fetch(`${API_URL}/tracking/${encodeURIComponent(code.trim())}`)
       .then(async res => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Erro ao rastrear.');
         setData(json);
       })
-      .catch(err => { setData(null); setError(err.message); });
+      .catch((err: Error) => { setData(null); setError(err.message); })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { handleSearch(); // eslint-disable-next-line
@@ -308,16 +407,26 @@ const Tracking = () => {
           </div>
         </div>
         <div className="flex items-end">
-          <button onClick={handleSearch} className="bg-[#1a3326] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#2d4a3e] flex items-center gap-2 h-[46px]">
-            <ArrowRight size={18} /> Rastrear encomenda
+          <button onClick={handleSearch} disabled={loading} className="bg-[#1a3326] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#2d4a3e] disabled:opacity-70 disabled:cursor-wait transition flex items-center gap-2 h-[46px]">
+            {loading ? <Spinner /> : <ArrowRight size={18} />} {loading ? 'Rastreando...' : 'Rastrear encomenda'}
           </button>
         </div>
       </div>
 
       {error && <div className="mb-6 p-4 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>}
 
-      {data && (
-        <div className="grid grid-cols-3 gap-6">
+      {loading && (
+        <div className="grid grid-cols-3 gap-6" aria-busy="true">
+          <div className="col-span-2 space-y-6">
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-72 w-full" />
+          </div>
+          <Skeleton className="h-72 w-full" />
+        </div>
+      )}
+
+      {!loading && data && (
+        <div className="grid grid-cols-3 gap-6 animate-fade-in-up">
           <div className="col-span-2 space-y-6">
             <div className="bg-[#e8f0eb] p-6 rounded-xl border border-green-100">
               <div className="flex items-center gap-3 mb-2">
@@ -332,7 +441,7 @@ const Tracking = () => {
               <h3 className="font-bold text-lg mb-6">Histórico de movimentações</h3>
               <div className="space-y-8 relative pl-4 border-l-2 border-gray-100 ml-2">
                 {data.history.map((h, i) => (
-                  <div key={i} className="relative pl-6">
+                  <div key={i} style={{ '--i': i } as CSSProperties} className="stagger relative pl-6">
                     <div className={`absolute -left-[21px] top-1 w-4 h-4 rounded-full border-2 ${h.current ? 'bg-[#1a3326] border-[#1a3326]' : 'bg-white border-gray-300'}`}></div>
                     <div className="flex justify-between items-start">
                       <div>
@@ -370,26 +479,29 @@ const Tracking = () => {
   );
 };
 
-const AddProduct = () => {
-  const [form, setForm] = useState({ name: 'Mouse Logitech MX Master 3S', value: '350', store: 'Loja Exemplo', tracking: '' });
+export const AddProduct = () => {
+  const [form, setForm] = useState<ProductForm>({ name: 'Mouse Logitech MX Master 3S', value: '350', store: 'Loja Exemplo', tracking: '', purchaseDate: '06/10/2026', cep: '01310-100', destination: 'São Paulo / SP' });
   const [msg, setMsg] = useState('');
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const [submitting, setSubmitting] = useState(false);
+  const set = (k: keyof ProductForm) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
   const num = Number(String(form.value).replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
   const brl = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const submit = () => {
     setMsg('');
-    fetch('http://localhost:3001/api/products', {
+    setSubmitting(true);
+    authFetch(`${API_URL}/products`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, value: num }),
+      body: JSON.stringify({ ...form, destination: form.destination.replace(/\s*\/\s*/, ', ').trim(), value: num }),
     })
       .then(async res => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error);
         setMsg(`Produto ${json.id} cadastrado com sucesso (demo).`);
       })
-      .catch(err => setMsg(err.message || 'Falha ao cadastrar.'));
+      .catch((err: Error) => setMsg(err.message || 'Falha ao cadastrar.'))
+      .finally(() => setSubmitting(false));
   };
 
   return (
@@ -403,7 +515,7 @@ const AddProduct = () => {
     </div>
 
     <div className="grid grid-cols-3 gap-8">
-      <div className="col-span-2 space-y-6">
+      <form className="col-span-2 space-y-6" onSubmit={(e) => { e.preventDefault(); if (!submitting) submit(); }}>
         {/* Dados do Produto */}
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <div className="flex justify-between items-center mb-6">
@@ -435,7 +547,7 @@ const AddProduct = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data da compra *</label>
-                <input type="text" defaultValue="06/10/2026" className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
+                <input type="text" value={form.purchaseDate} onChange={set('purchaseDate')} className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
               </div>
             </div>
           </div>
@@ -459,11 +571,11 @@ const AddProduct = () => {
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">CEP de destino *</label>
-              <input type="text" defaultValue="01310-100" className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
+              <input type="text" value={form.cep} onChange={set('cep')} className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Cidade / UF *</label>
-              <input type="text" defaultValue="São Paulo / SP" className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
+              <input type="text" value={form.destination} onChange={set('destination')} className="w-full border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-[#1a3326]" />
             </div>
           </div>
         </div>
@@ -473,14 +585,14 @@ const AddProduct = () => {
           Estou ciente de que este cadastro é demonstrativo e não gera contratação real.
         </div>
 
-        {msg && <div className="p-3 rounded-lg bg-[#e8f0eb] text-[#1a3326] text-sm">{msg}</div>}
+        {msg && <div className="p-3 rounded-lg bg-[#e8f0eb] text-[#1a3326] text-sm animate-pop-in">{msg}</div>}
         <div className="flex justify-between pt-4">
-          <Link to="/dashboard" className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">Cancelar</Link>
-          <button onClick={submit} className="px-6 py-2 bg-[#1a3326] text-white rounded-lg font-medium hover:bg-[#2d4a3e] flex items-center gap-2">
-            <CheckCircle size={18} /> Cadastrar produto (demo)
+          <Link href="/dashboard" className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">Cancelar</Link>
+          <button type="submit" disabled={submitting} className="px-6 py-2 bg-[#1a3326] text-white rounded-lg font-medium hover:bg-[#2d4a3e] disabled:opacity-70 disabled:cursor-wait transition flex items-center gap-2">
+            {submitting ? <Spinner /> : <CheckCircle size={18} />} {submitting ? 'Cadastrando...' : 'Cadastrar produto (demo)'}
           </button>
         </div>
-      </div>
+      </form>
 
       {/* Sidebar Resumo */}
       <div className="space-y-6">
@@ -501,7 +613,7 @@ const AddProduct = () => {
           <div className="space-y-3 text-sm mb-6">
             <div className="flex justify-between"><span className="text-gray-500">Valor do produto</span><span className="font-medium">{brl(num)}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Taxa ilustrativa</span><span className="font-medium">2% por envio</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Destino</span><span className="font-medium">São Paulo, SP</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Destino</span><span className="font-medium">{form.destination}</span></div>
           </div>
 
           <div className="pt-4 border-t border-gray-100">
@@ -522,7 +634,7 @@ const AddProduct = () => {
   );
 };
 
-const LandingPage = () => (
+export const LandingPage = () => (
   <div className="min-h-screen bg-[#f4f6f5] font-sans">
     <nav className="bg-[#1a3326] text-white p-4 flex justify-between items-center px-8">
       <div className="flex items-center gap-2">
@@ -534,27 +646,27 @@ const LandingPage = () => (
         <a href="#" className="hover:text-gray-300">Sobre a LogMagna</a>
       </div>
       <div className="flex gap-3">
-        <Link to="/dashboard" className="px-4 py-2 border border-gray-600 rounded-lg hover:bg-white/10 transition">Área do cliente</Link>
-        <Link to="/add" className="px-4 py-2 bg-[#4a6b56] rounded-lg hover:bg-[#5c826a] transition">Criar cadastro</Link>
+        <Link href="/login" className="px-4 py-2 border border-gray-600 rounded-lg hover:bg-white/10 transition">Entrar</Link>
+        <Link href="/add" className="px-4 py-2 bg-[#4a6b56] rounded-lg hover:bg-[#5c826a] transition">Criar cadastro</Link>
       </div>
     </nav>
 
     <header className="max-w-6xl mx-auto px-8 py-20 grid grid-cols-2 gap-12 items-center">
-      <div>
+      <div className="animate-fade-in-up">
         <span className="bg-[#1a3326] text-white text-xs px-3 py-1 rounded-full uppercase tracking-wider font-bold">Suas compras, mais organizadas.</span>
         <h1 className="text-5xl font-bold text-[#1a3326] mt-6 mb-6 leading-tight">Mais cuidado com o que chega até você.</h1>
         <p className="text-gray-600 text-lg mb-8">Uma nova forma de gerenciar seguros de encomendas e compras online. Cadastre seus produtos, visualize seus serviços e acompanhe cada entrega em um só lugar.</p>
         <div className="flex gap-4">
-          <Link to="/dashboard" className="bg-[#1a3326] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#2d4a3e] flex items-center gap-2">
+          <Link href="/dashboard" className="bg-[#1a3326] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#2d4a3e] flex items-center gap-2">
             <ArrowRight size={18} /> Conhecer a área do cliente
           </Link>
-          <Link to="/add" className="bg-white text-[#1a3326] border border-gray-200 px-6 py-3 rounded-lg font-medium hover:bg-gray-50">
+          <Link href="/add" className="bg-white text-[#1a3326] border border-gray-200 px-6 py-3 rounded-lg font-medium hover:bg-gray-50">
             Criar meu cadastro
           </Link>
         </div>
         <p className="text-xs text-gray-400 mt-6 flex items-center gap-2"><Info size={14} /> Apresentação demonstrativa. Não comercializa seguros.</p>
       </div>
-      <div className="relative">
+      <div className="relative animate-pop-in" style={{ animationDelay: '150ms' }}>
         <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 absolute -bottom-10 -left-10 z-10 max-w-xs">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-green-50 rounded-lg text-[#1a3326]"><Box size={20} /></div>
@@ -563,7 +675,7 @@ const LandingPage = () => (
           <p className="text-xs text-gray-500">Do cadastro à entrega, tudo no seu painel.</p>
         </div>
         <div className="rounded-3xl h-96 w-full overflow-hidden">
-          <img src={boxesImg} alt="Encomendas empilhadas" className="w-full h-full object-cover" />
+          <img src={boxesImg.src} alt="Encomendas empilhadas" className="w-full h-full object-cover" />
         </div>
       </div>
     </header>
@@ -580,7 +692,7 @@ const LandingPage = () => (
             { icon: ShieldCheck, title: 'Organize seus serviços', desc: 'Consulte os registros de seguros e os valores ilustrativos em um painel simples.' },
             { icon: PackageSearch, title: 'Acompanhe o caminho', desc: 'Visualize o status do envio e o histórico de movimentações até a entrega.' }
           ].map((item, i) => (
-            <div key={i} className="relative">
+            <div key={i} style={{ '--i': i } as CSSProperties} className="stagger hover-lift relative">
               <span className="absolute -top-4 -right-2 text-6xl font-bold text-gray-100 -z-10">0{i + 1}</span>
               <item.icon size={32} className="text-[#1a3326] mb-4" />
               <h3 className="text-xl font-bold text-gray-900 mb-2">{item.title}</h3>
@@ -602,22 +714,3 @@ const LandingPage = () => (
     </footer>
   </div>
 );
-
-// --- APP PRINCIPAL ---
-
-function App() {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/tracking" element={<Tracking />} />
-        <Route path="/add" element={<AddProduct />} />
-        <Route path="/unidades" element={<Layout title="Unidades"><ListaUnidades /></Layout>} />
-      </Routes>
-    </Router>
-  );
-}
-
-export default App;

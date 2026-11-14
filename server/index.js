@@ -1,39 +1,41 @@
 const express = require('express');
 const cors = require('cors');
 const rotasUnidades = require('./unidades');
+const rotasAuth = require('./auth');
+const { requireAuth } = rotasAuth;
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+// CORS restrito a origem do front (CLIENT_URL; padrao: Next.js em dev).
+app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:3000' }));
 app.use(express.json());
-app.use('/api/unidades', rotasUnidades);
 
-const RATE = 0.02;
+// Latencia simulada para exibir loadings no front (MOCK_DELAY_MS=0 desativa).
+// Nunca aplicada em producao.
+const MOCK_DELAY_MS = process.env.NODE_ENV === 'production' ? 0 : Number(process.env.MOCK_DELAY_MS ?? 600);
+app.use('/api', (req, res, next) => setTimeout(next, MOCK_DELAY_MS));
+app.use('/api/auth', rotasAuth);
+app.use('/api/unidades', requireAuth, rotasUnidades);
 
-const products = [
-  { id: 'LM-2026-001', name: 'Notebook Dell Inspiron', value: 4200, status: 'Em trânsito', tracking: 'BR123456789SP', origin: 'Campinas, SP', destination: 'São Paulo, SP' },
-  { id: 'LM-2026-002', name: 'Fone Sony WH-1000XM5', value: 2000, status: 'Aguardando', tracking: 'BR987654321SP', origin: 'Curitiba, PR', destination: 'São Paulo, SP' },
-  { id: 'LM-2026-003', name: 'Câmera Canon EOS R50', value: 1800, status: 'Entregue', tracking: 'BR555444333SP', origin: 'Rio de Janeiro, RJ', destination: 'São Paulo, SP' },
-].map((p) => ({ ...p, cost: +(p.value * RATE).toFixed(2) }));
-
-const history = {
-  'BR123456789SP': [
-    { status: 'Pacote saiu para entrega', location: 'Centro de distribuição • São Paulo, SP', date: '08/10 • 08:15', current: true },
-    { status: 'Pacote em trânsito', location: 'Unidade de tratamento • Campinas, SP', date: '07/10 • 22:40' },
-    { status: 'Pacote postado', location: 'Agência • Campinas, SP', date: '06/10 • 09:42' },
-  ],
-};
+const { RATE, products, history } = require('./seeds');
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-app.get('/api/products', (req, res) => res.json(products));
+app.get('/api/products', requireAuth, (req, res) => res.json(products));
 
-app.post('/api/products', (req, res) => {
-  const { name, value, store, destination, tracking } = req.body || {};
+app.post('/api/products', requireAuth, (req, res) => {
+  const { name, value, store, destination, tracking, purchaseDate, cep } = req.body || {};
   const num = Number(value);
-  if (!name || !Number.isFinite(num) || num <= 0) {
+  if (typeof name !== 'string' || !name.trim() || !Number.isFinite(num) || num <= 0) {
     return res.status(400).json({ error: 'Nome e valor válidos são obrigatórios.' });
+  }
+  if (name.trim().length > 120) {
+    return res.status(400).json({ error: 'O nome do produto deve ter no máximo 120 caracteres.' });
+  }
+  const camposTexto = [name, store, destination, tracking, purchaseDate, cep].filter((v) => typeof v === 'string');
+  if (camposTexto.some((v) => /[<>]/.test(v))) {
+    return res.status(400).json({ error: 'Caracteres HTML (< ou >) não são permitidos.' });
   }
   const product = {
     id: `LM-2026-${String(products.length + 1).padStart(3, '0')}`,
@@ -43,6 +45,8 @@ app.post('/api/products', (req, res) => {
     status: 'Aguardando',
     tracking: tracking || '',
     store: store || '',
+    purchaseDate: typeof purchaseDate === 'string' ? purchaseDate : '',
+    cep: typeof cep === 'string' ? cep : '',
     origin: 'Origem demo',
     destination: destination || 'São Paulo, SP',
   };
@@ -62,4 +66,16 @@ app.get('/api/tracking/:code', (req, res) => {
   });
 });
 
-app.listen(PORT, () => console.log(`LogMagna API rodando em http://localhost:${PORT}`));
+// Tratamento global de erros: sempre JSON, sem stack trace.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = err.status || err.statusCode || 500;
+  let msg = 'Erro interno do servidor.';
+  if (err.type === 'entity.too.large') msg = 'O conteúdo enviado excede o limite permitido (100 KB).';
+  else if (err.type === 'entity.parse.failed') msg = 'JSON inválido.';
+  else if (status < 500) msg = 'Requisição inválida.';
+  else console.error(err);
+  res.status(status).json({ error: msg, erro: msg });
+});
+
+app.listen(PORT,  () => console.log(`LogMagna API rodando em http://localhost:${PORT}`));

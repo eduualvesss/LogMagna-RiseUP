@@ -1,12 +1,29 @@
+'use client';
+
+import type { ChangeEvent, FormEvent } from 'react';
 import { useEffect, useState } from "react";
+import { Skeleton } from "./Loading";
+import { authFetch } from "../lib/auth";
+import { API_URL } from "../lib/config";
 import "./ListaUnidades.css";
 
-// Ajuste se o servidor da equipe usar outra porta.
-const API = "http://localhost:3001/api/unidades";
+const API = `${API_URL}/unidades`;
 
 const TIPOS = ["Matriz", "Filial", "Centro de distribuição"];
 
-const FORM_VAZIO = {
+interface Unidade {
+  id: number;
+  nome: string;
+  tipo: string;
+  cidade: string;
+  estado: string;
+  status: string;
+  version?: number;
+}
+
+type FormUnidade = Omit<Unidade, 'id'>;
+
+const FORM_VAZIO: FormUnidade = {
   nome: "",
   tipo: "Filial",
   cidade: "",
@@ -15,17 +32,18 @@ const FORM_VAZIO = {
 };
 
 export default function ListaUnidades() {
-  const [unidades, setUnidades] = useState([]);
+  const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
   const [formAberto, setFormAberto] = useState(false);
-  const [editandoId, setEditandoId] = useState(null);
-  const [form, setForm] = useState(FORM_VAZIO);
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [form, setForm] = useState<FormUnidade>(FORM_VAZIO);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState<Unidade | null>(null);
 
-  async function carregar() {
+  async function carregar(signal?: AbortSignal) {
     setCarregando(true);
     setErro("");
     try {
@@ -33,20 +51,25 @@ export default function ListaUnidades() {
       if (busca) params.set("busca", busca);
       if (filtroStatus) params.set("status", filtroStatus);
 
-      const resp = await fetch(`${API}?${params}`);
+      const resp = await authFetch(`${API}?${params}`, { signal });
       if (!resp.ok) throw new Error("Não foi possível carregar as unidades.");
       setUnidades(await resp.json());
     } catch (e) {
-      setErro(e.message);
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setErro(e instanceof Error ? e.message : String(e));
     } finally {
-      setCarregando(false);
+      if (!signal?.aborted) setCarregando(false);
     }
   }
 
-  // Recarrega ao mudar busca ou filtro (com pequena espera ao digitar).
+  // Recarrega ao mudar busca ou filtro (com debounce e cancelamento de requisicoes anteriores).
   useEffect(() => {
-    const espera = setTimeout(carregar, 300);
-    return () => clearTimeout(espera);
+    const controller = new AbortController();
+    const espera = setTimeout(() => carregar(controller.signal), 300);
+    return () => {
+      clearTimeout(espera);
+      controller.abort();
+    };
   }, [busca, filtroStatus]);
 
   function abrirNovo() {
@@ -56,7 +79,7 @@ export default function ListaUnidades() {
     setFormAberto(true);
   }
 
-  function abrirEdicao(unidade) {
+  function abrirEdicao(unidade: Unidade) {
     setEditandoId(unidade.id);
     setForm({
       nome: unidade.nome,
@@ -64,6 +87,7 @@ export default function ListaUnidades() {
       cidade: unidade.cidade,
       estado: unidade.estado,
       status: unidade.status,
+      version: unidade.version,
     });
     setErro("");
     setFormAberto(true);
@@ -74,15 +98,15 @@ export default function ListaUnidades() {
     setEditandoId(null);
   }
 
-  function alterarCampo(e) {
+  function alterarCampo(e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  async function salvar(e) {
+  async function salvar(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErro("");
     try {
-      const resp = await fetch(editandoId ? `${API}/${editandoId}` : API, {
+      const resp = await authFetch(editandoId ? `${API}/${editandoId}` : API, {
         method: editandoId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -94,18 +118,20 @@ export default function ListaUnidades() {
       fecharForm();
       carregar();
     } catch (e) {
-      setErro(e.message);
+      setErro(e instanceof Error ? e.message : String(e));
     }
   }
 
-  async function excluir(unidade) {
-    if (!window.confirm(`Excluir a unidade "${unidade.nome}"?`)) return;
+  async function confirmarExclusao() {
+    if (!confirmandoExclusao) return;
+    const alvo = confirmandoExclusao;
+    setConfirmandoExclusao(null);
     try {
-      const resp = await fetch(`${API}/${unidade.id}`, { method: "DELETE" });
+      const resp = await authFetch(`${API}/${alvo.id}`, { method: "DELETE" });
       if (!resp.ok) throw new Error("Erro ao excluir a unidade.");
       carregar();
     } catch (e) {
-      setErro(e.message);
+      setErro(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -143,13 +169,47 @@ export default function ListaUnidades() {
         </p>
       )}
 
+      {confirmandoExclusao && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-excluir-titulo"
+        >
+          <div className="bg-white rounded-xl border border-gray-200 shadow-xl max-w-md w-full p-6 animate-pop-in">
+            <h2 id="modal-excluir-titulo" className="text-lg font-bold text-gray-900 mb-2">
+              Confirmar exclusão
+            </h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Tem certeza que deseja excluir a unidade <strong>{confirmandoExclusao.nome}</strong> ({confirmandoExclusao.cidade}/{confirmandoExclusao.estado})?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="unidades-btn"
+                onClick={() => setConfirmandoExclusao(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition"
+                onClick={confirmarExclusao}
+              >
+                Excluir unidade
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {formAberto && (
         <form className="unidades__form" onSubmit={salvar}>
           <h2>{editandoId ? "Editar unidade" : "Nova unidade"}</h2>
 
           <label>
             Nome
-            <input name="nome" value={form.nome} onChange={alterarCampo} required />
+            <input name="nome" maxLength={120} value={form.nome} onChange={alterarCampo} required />
           </label>
 
           <label>
@@ -165,7 +225,7 @@ export default function ListaUnidades() {
 
           <label>
             Cidade
-            <input name="cidade" value={form.cidade} onChange={alterarCampo} required />
+            <input name="cidade" maxLength={80} value={form.cidade} onChange={alterarCampo} required />
           </label>
 
           <label>
@@ -200,7 +260,7 @@ export default function ListaUnidades() {
       )}
 
       {carregando ? (
-        <p className="unidades__vazio">Carregando unidades...</p>
+        <div className="unidades__vazio" aria-busy="true" role="status">{[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full mb-3" />)}</div>
       ) : unidades.length === 0 ? (
         <p className="unidades__vazio">
           Nenhuma unidade encontrada. Ajuste a busca ou cadastre uma nova unidade.
@@ -220,7 +280,7 @@ export default function ListaUnidades() {
             </thead>
             <tbody>
               {unidades.map((u) => (
-                <tr key={u.id}>
+                <tr key={u.id} className="animate-fade-in-up">
                   <td>{u.nome}</td>
                   <td>{u.tipo}</td>
                   <td>{u.cidade}</td>
@@ -234,7 +294,7 @@ export default function ListaUnidades() {
                     <button className="unidades-btn unidades-btn--link" onClick={() => abrirEdicao(u)}>
                       Editar
                     </button>
-                    <button className="unidades-btn unidades-btn--link unidades-btn--perigo" onClick={() => excluir(u)}>
+                    <button className="unidades-btn unidades-btn--link unidades-btn--perigo" onClick={() => setConfirmandoExclusao(u)}>
                       Excluir
                     </button>
                   </td>
