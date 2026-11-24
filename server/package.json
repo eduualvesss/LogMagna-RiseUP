@@ -1,17 +1,17 @@
 {
-  "name": "server",
+  "name": "logmagna-server",
   "version": "1.0.0",
-  "description": "",
+  "private": true,
+  "description": "API REST Express + SQLite (Banco Magna) da plataforma LogMagna",
   "main": "index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node --watch index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.3.0"

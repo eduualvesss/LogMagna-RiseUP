@@ -2,13 +2,18 @@
   "name": "logmagna-riseup",
   "version": "1.0.0",
   "private": true,
-  "description": "LogMagna - Plataforma de Gestão e Rastreamento de Encomendas",
+  "description": "LogMagna - Plataforma de Gestão, Rastreamento e Seguros de Encomendas",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "install:all": "npm --prefix server install && npm --prefix client install",
     "dev": "node dev.js",
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev",
+    "lint": "npm --prefix client run lint",
     "build": "npm --prefix client run build",
-    "start": "npm --prefix server start"
+    "start": "npm --prefix server start",
+    "db:reset": "node server/db/reset.js"
   }
 }
