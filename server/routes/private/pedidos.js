@@ -1,5 +1,5 @@
 const express = require('express');
-const db = require('../db');
+const db = require('../../db');
 
 const router = express.Router();
 
@@ -23,21 +23,14 @@ function adicionarDiasIso(iso, dias) {
   return d.toISOString();
 }
 
-function formatarDataEventoBr(iso) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(iso || '');
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)} • ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-}
-
 function gerarCodigoRastreioUnico() {
   for (let i = 0; i < 10; i++) {
     const num = Math.floor(100000000 + Math.random() * 900000000);
-    const code = `BR${num}SP`;
+    const code = `LM${num}BR`;
     const jaExiste = db.get('SELECT id_remessa FROM REMESSA WHERE UPPER(codigo_rastreio) = ?', code);
     if (!jaExiste) return code;
   }
-  return `BR${Date.now().toString().slice(-9)}SP`;
+  return `LM${Date.now().toString().slice(-9)}BR`;
 }
 
 const SELECT_PEDIDO = `
@@ -83,29 +76,41 @@ const SELECT_PEDIDO = `
 function mapPedidoRow(row) {
   const valor = Number(row.valor_declarado || 0);
   const premio = row.valor_premio != null ? Number(row.valor_premio) : +(valor * db.RATE).toFixed(2);
-  const nome = row.nome_produto || `Pedido ${row.id_pedido}`;
   return {
-    ...row,
-    retido_analise: Boolean(row.retido_analise),
+    id_pedido: row.id_pedido,
+    id_cliente: row.id_cliente,
+    cliente_nome: row.cliente_nome,
+    data_compra: row.data_compra,
     valor_declarado: valor,
+    status: row.status,
+    retido_analise: Boolean(row.retido_analise),
+    motivo_retencao: row.motivo_retencao || null,
+    id_categoria: row.id_categoria || null,
+    categoria_descricao: row.categoria_descricao || null,
+    nome_produto: row.nome_produto || `Pedido ${row.id_pedido}`,
+    loja: row.loja || null,
+    id_remessa: row.id_remessa || null,
+    codigo_rastreio: row.codigo_rastreio || null,
+    data_envio: row.data_envio || null,
+    previsao_entrega: row.previsao_entrega || null,
+    status_entrega: row.status_entrega || null,
+    transportadora: row.transportadora || null,
+    origem: row.origem || null,
+    destino: row.destino || null,
+    cep_destino: row.cep_destino || null,
+    id_apolice: row.id_apolice || null,
+    id_seguradora: row.id_seguradora || null,
     valor_segurado: row.valor_segurado != null ? Number(row.valor_segurado) : valor,
     valor_premio: premio,
-    // Aliases de compatibilidade com o frontend existente
-    id: row.id_pedido,
-    name: nome,
-    value: valor,
-    cost: premio,
-    status: row.status,
-    tracking: row.codigo_rastreio || '',
-    origin: row.origem || 'Centro Logístico',
-    destination: row.destino || 'São Paulo, SP',
-    store: row.loja || '',
-    purchaseDate: row.data_compra,
-    cep: row.cep_destino || '',
+    vigencia_inicio: row.vigencia_inicio || null,
+    vigencia_fim: row.vigencia_fim || null,
+    coberturas: row.coberturas || null,
+    seguradora_razao_social: row.seguradora_razao_social || null,
+    seguradora_contato: row.seguradora_contato || null,
   };
 }
 
-// GET /api/pedidos (e /api/products)
+// GET /api/pedidos
 router.get('/', (req, res) => {
   const busca = typeof req.query.busca === 'string' ? req.query.busca.trim().toLowerCase() : '';
   const status = typeof req.query.status === 'string' ? req.query.status.trim() : '';
@@ -121,7 +126,7 @@ router.get('/', (req, res) => {
   }
   if (busca) {
     conds.push(
-      '(LOWER(p.id_pedido) LIKE ? OR LOWER(COALESCE(p.nome_produto, \'\')) LIKE ? OR LOWER(COALESCE(r.codigo_rastreio, \'\')) LIKE ? OR LOWER(COALESCE(p.loja, \'\')) LIKE ?)'
+      "(LOWER(p.id_pedido) LIKE ? OR LOWER(COALESCE(p.nome_produto, '')) LIKE ? OR LOWER(COALESCE(r.codigo_rastreio, '')) LIKE ? OR LOWER(COALESCE(p.loja, '')) LIKE ?)"
     );
     params.push(`%${busca}%`, `%${busca}%`, `%${busca}%`, `%${busca}%`);
   }
@@ -140,6 +145,52 @@ router.get('/', (req, res) => {
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
   const rows = db.all(`${SELECT_PEDIDO} ${where} ORDER BY p.data_compra DESC, p.id_pedido DESC`, ...params);
   res.json(rows.map(mapPedidoRow));
+});
+
+// GET /api/pedidos/rastreio/:code (rastreio completo autenticado com escopo)
+router.get('/rastreio/:code', (req, res) => {
+  const code = String(req.params.code || '').trim().toUpperCase();
+  if (!code) return res.status(400).json({ error: 'Informe o código de rastreio.' });
+
+  const row = db.get(`${SELECT_PEDIDO} WHERE UPPER(r.codigo_rastreio) = ?`, code);
+  if (!row) return res.status(404).json({ error: 'Código de rastreio não encontrado.' });
+  if (!req.user.isAdmin && row.id_cliente !== req.user.cliente_id_cliente) {
+    return res.status(403).json({ error: 'Acesso negado a esta remessa.' });
+  }
+
+  const eventosDb = db.all(
+    `SELECT id_evento, id_remessa, data_hora, descricao, localizacao
+     FROM EVENTO_RASTREIO
+     WHERE id_remessa = ?
+     ORDER BY data_hora DESC, id_evento DESC`,
+    row.id_remessa
+  );
+
+  const eventos = eventosDb.length
+    ? eventosDb
+    : [
+        {
+          id_evento: 'EVT-INICIAL',
+          id_remessa: row.id_remessa,
+          data_hora: row.data_envio || row.data_compra,
+          descricao: row.status_entrega || row.status,
+          localizacao: row.origem || 'Centro Logístico',
+        },
+      ];
+
+  const ocorrencias = db.all(
+    `SELECT id_ocorrencia, id_remessa, tipo, data_ocorrencia, descricao
+     FROM OCORRENCIA
+     WHERE id_remessa = ?
+     ORDER BY data_ocorrencia DESC`,
+    row.id_remessa
+  );
+
+  res.json({
+    ...mapPedidoRow(row),
+    eventos,
+    ocorrencias,
+  });
 });
 
 // GET /api/pedidos/:id
@@ -173,37 +224,42 @@ router.get('/:id', (req, res) => {
   res.json({ ...mapPedidoRow(row), eventos, ocorrencias });
 });
 
-// POST /api/pedidos (e /api/products)
+// POST /api/pedidos
 router.post('/', (req, res) => {
-  const body = req.body || {};
-  const nomeBruto = body.name ?? body.nome_produto;
-  const valorBruto = body.value ?? body.valor_declarado;
-  const store = body.store ?? body.loja ?? '';
-  const destination = body.destination ?? body.destino ?? 'São Paulo, SP';
-  const origin = body.origin ?? body.origem ?? 'Centro Logístico • São Paulo, SP';
-  const trackingRaw = body.tracking ?? body.codigo_rastreio ?? '';
-  const purchaseDate = body.purchaseDate ?? body.data_compra ?? '';
-  const cep = body.cep ?? body.cep_destino ?? '';
-  const transportadora = body.transportadora ?? 'LogMagna Express';
-  const coberturas = body.coberturas ?? 'Roubo, extravio e avaria no transporte';
+  const {
+    nome_produto,
+    valor_declarado,
+    loja = '',
+    destino = 'São Paulo, SP',
+    origem = 'Centro Logístico',
+    codigo_rastreio = '',
+    data_compra = '',
+    cep_destino = '',
+    transportadora = 'LogMagna Express',
+    coberturas = 'Roubo, extravio e avaria no transporte',
+    id_categoria: idCategoriaBody,
+    id_seguradora: idSeguradoraBody,
+    previsao_entrega,
+    id_cliente: idClienteBody,
+  } = req.body || {};
 
-  const num = Number(valorBruto);
-  if (typeof nomeBruto !== 'string' || !nomeBruto.trim() || !Number.isFinite(num) || num <= 0) {
-    return res.status(400).json({ error: 'Nome e valor válidos são obrigatórios.' });
+  const num = Number(valor_declarado);
+  if (typeof nome_produto !== 'string' || !nome_produto.trim() || !Number.isFinite(num) || num <= 0) {
+    return res.status(400).json({ error: 'Nome do produto e valor declarado válidos são obrigatórios.' });
   }
-  const nome = nomeBruto.trim();
+  const nome = nome_produto.trim();
   if (nome.length > 120) {
     return res.status(400).json({ error: 'O nome do produto deve ter no máximo 120 caracteres.' });
   }
 
   const camposTexto = [
     nome,
-    store,
-    destination,
-    origin,
-    trackingRaw,
-    purchaseDate,
-    cep,
+    loja,
+    destino,
+    origem,
+    codigo_rastreio,
+    data_compra,
+    cep_destino,
     transportadora,
     coberturas,
   ].filter((v) => typeof v === 'string');
@@ -213,8 +269,8 @@ router.post('/', (req, res) => {
   }
 
   let idCliente = req.user.cliente_id_cliente;
-  if (req.user.isAdmin && typeof body.id_cliente === 'string' && body.id_cliente.trim()) {
-    const cliExiste = db.get('SELECT id_cliente FROM CLIENTE WHERE id_cliente = ?', body.id_cliente.trim());
+  if (req.user.isAdmin && typeof idClienteBody === 'string' && idClienteBody.trim()) {
+    const cliExiste = db.get('SELECT id_cliente FROM CLIENTE WHERE id_cliente = ?', idClienteBody.trim());
     if (!cliExiste) return res.status(400).json({ error: 'Cliente informado não encontrado.' });
     idCliente = cliExiste.id_cliente;
   }
@@ -223,8 +279,8 @@ router.post('/', (req, res) => {
   }
 
   let idCategoria = null;
-  if (typeof body.id_categoria === 'string' && body.id_categoria.trim()) {
-    const cat = db.get('SELECT id_categoria FROM CATEGORIA_PRODUTO WHERE id_categoria = ?', body.id_categoria.trim());
+  if (typeof idCategoriaBody === 'string' && idCategoriaBody.trim()) {
+    const cat = db.get('SELECT id_categoria FROM CATEGORIA_PRODUTO WHERE id_categoria = ?', idCategoriaBody.trim());
     if (!cat) return res.status(400).json({ error: 'Categoria de produto não encontrada.' });
     idCategoria = cat.id_categoria;
   } else {
@@ -233,8 +289,8 @@ router.post('/', (req, res) => {
   }
 
   let idSeguradora = null;
-  if (typeof body.id_seguradora === 'string' && body.id_seguradora.trim()) {
-    const seg = db.get('SELECT id_seguradora FROM SEGURADORA WHERE id_seguradora = ?', body.id_seguradora.trim());
+  if (typeof idSeguradoraBody === 'string' && idSeguradoraBody.trim()) {
+    const seg = db.get('SELECT id_seguradora FROM SEGURADORA WHERE id_seguradora = ?', idSeguradoraBody.trim());
     if (!seg) return res.status(400).json({ error: 'Seguradora não encontrada.' });
     idSeguradora = seg.id_seguradora;
   } else {
@@ -245,7 +301,7 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Nenhuma seguradora cadastrada para emitir a apólice.' });
   }
 
-  let codigoRastreio = typeof trackingRaw === 'string' ? trackingRaw.trim().toUpperCase() : '';
+  let codigoRastreio = typeof codigo_rastreio === 'string' ? codigo_rastreio.trim().toUpperCase() : '';
   if (codigoRastreio) {
     if (codigoRastreio.length > 50) {
       return res.status(400).json({ error: 'O código de rastreio deve ter no máximo 50 caracteres.' });
@@ -258,15 +314,13 @@ router.post('/', (req, res) => {
     codigoRastreio = gerarCodigoRastreioUnico();
   }
 
-  const dataCompraIso = parseDataCompra(purchaseDate);
-  const previsaoIso = body.previsao_entrega
-    ? parseDataCompra(body.previsao_entrega)
-    : adicionarDiasIso(dataCompraIso, 5);
+  const dataCompraIso = parseDataCompra(data_compra);
+  const previsaoIso = previsao_entrega ? parseDataCompra(previsao_entrega) : adicionarDiasIso(dataCompraIso, 5);
   const vigenciaInicio = dataCompraIso.slice(0, 10);
   const vigenciaFim = adicionarDiasIso(dataCompraIso, 365).slice(0, 10);
   const premio = +(num * db.RATE).toFixed(2);
 
-  const idPedido = db.gerarId('LM-2026');
+  const idPedido = db.gerarId('PED');
   const idApolice = db.gerarId('APL');
   const idRemessa = db.gerarId('REM');
   const idEvento = db.gerarId('EVT');
@@ -294,7 +348,7 @@ router.post('/', (req, res) => {
       num,
       idCategoria,
       nome,
-      typeof store === 'string' ? store.trim().slice(0, 120) : ''
+      typeof loja === 'string' ? loja.trim().slice(0, 120) : ''
     );
 
     db.run(
@@ -307,9 +361,9 @@ router.post('/', (req, res) => {
       idPedido,
       idApolice,
       String(transportadora).trim().slice(0, 120) || 'LogMagna Express',
-      String(origin).trim().slice(0, 120) || 'Centro Logístico',
-      String(destination).trim().slice(0, 120) || 'São Paulo, SP',
-      typeof cep === 'string' ? cep.trim().slice(0, 20) : ''
+      String(origem).trim().slice(0, 120) || 'Centro Logístico',
+      String(destino).trim().slice(0, 120) || 'São Paulo, SP',
+      typeof cep_destino === 'string' ? cep_destino.trim().slice(0, 20) : ''
     );
 
     db.run(
@@ -319,7 +373,7 @@ router.post('/', (req, res) => {
       idRemessa,
       dataCompraIso,
       'Pedido registrado e aguardando postagem',
-      String(origin).trim().slice(0, 120) || 'Centro Logístico'
+      String(origem).trim().slice(0, 120) || 'Centro Logístico'
     );
 
     db.run(
@@ -430,56 +484,48 @@ router.patch('/:id', (req, res) => {
   res.json(mapPedidoRow(atualizado));
 });
 
-// GET /api/tracking/:code
-function trackingHandler(req, res) {
-  const code = String(req.params.code || '').trim().toUpperCase();
-  if (!code) return res.status(400).json({ error: 'Informe o código de rastreio.' });
+// DELETE /api/pedidos/:id
+router.delete('/:id', (req, res) => {
+  const atual = db.get(`${SELECT_PEDIDO} WHERE p.id_pedido = ?`, req.params.id);
+  if (!atual) return res.status(404).json({ error: 'Pedido não encontrado.' });
+  if (!req.user.isAdmin && atual.id_cliente !== req.user.cliente_id_cliente) {
+    return res.status(403).json({ error: 'Acesso negado a este pedido.' });
+  }
 
-  const row = db.get(`${SELECT_PEDIDO} WHERE UPPER(r.codigo_rastreio) = ?`, code);
-  if (!row) return res.status(404).json({ error: 'Código de rastreio não encontrado.' });
+  if (atual.id_remessa) {
+    const ocos = db.get('SELECT COUNT(*) AS n FROM OCORRENCIA WHERE id_remessa = ?', atual.id_remessa);
+    if ((ocos?.n || 0) > 0) {
+      return res.status(409).json({ error: 'Não é possível excluir um pedido que possui ocorrências ou sinistros.' });
+    }
+  }
+  const atds = db.get('SELECT COUNT(*) AS n FROM ATENDIMENTO WHERE id_pedido = ?', atual.id_pedido);
+  if ((atds?.n || 0) > 0) {
+    return res.status(409).json({ error: 'Não é possível excluir um pedido vinculado a atendimentos.' });
+  }
 
-  const eventos = db.all(
-    `SELECT id_evento, id_remessa, data_hora, descricao, localizacao
-     FROM EVENTO_RASTREIO
-     WHERE id_remessa = ?
-     ORDER BY data_hora DESC, id_evento DESC`,
-    row.id_remessa
-  );
-
-  const ocorrencias = db.all(
-    `SELECT id_ocorrencia, id_remessa, tipo, data_ocorrencia, descricao
-     FROM OCORRENCIA
-     WHERE id_remessa = ?
-     ORDER BY data_ocorrencia DESC`,
-    row.id_remessa
-  );
-
-  const history = eventos.length
-    ? eventos.map((e, i) => ({
-        id_evento: e.id_evento,
-        status: e.descricao,
-        location: e.localizacao || row.origem || 'Brasil',
-        date: formatarDataEventoBr(e.data_hora),
-        data_hora: e.data_hora,
-        current: i === 0,
-      }))
-    : [
-        {
-          status: row.status_entrega || row.status,
-          location: row.origem || 'Centro Logístico',
-          date: formatarDataEventoBr(row.data_envio || row.data_compra),
-          data_hora: row.data_envio || row.data_compra,
-          current: true,
-        },
-      ];
-
-  res.json({
-    ...mapPedidoRow(row),
-    eventos,
-    ocorrencias,
-    history,
+  db.transaction(() => {
+    if (atual.id_remessa) {
+      db.run('DELETE FROM EVENTO_RASTREIO WHERE id_remessa = ?', atual.id_remessa);
+      db.run('DELETE FROM REMESSA WHERE id_remessa = ?', atual.id_remessa);
+    }
+    db.run('DELETE FROM PEDIDO WHERE id_pedido = ?', atual.id_pedido);
+    if (atual.id_apolice) {
+      const emUso = db.get('SELECT COUNT(*) AS n FROM REMESSA WHERE id_apolice = ?', atual.id_apolice);
+      const emSinistro = db.get('SELECT COUNT(*) AS n FROM SINISTRO WHERE id_apolice = ?', atual.id_apolice);
+      if ((emUso?.n || 0) === 0 && (emSinistro?.n || 0) === 0) {
+        db.run('DELETE FROM APOLICE WHERE id_apolice = ?', atual.id_apolice);
+      }
+    }
+    db.registrarAuditoria({
+      idUsuario: req.user.id_usuario,
+      entidade: 'PEDIDO',
+      idRegistro: atual.id_pedido,
+      acao: 'EXCLUIR',
+    });
   });
-}
+
+  res.status(204).end();
+});
 
 // POST /api/remessas/:id/eventos
 function criarEventoRemessaHandler(req, res) {
@@ -543,7 +589,6 @@ function criarEventoRemessaHandler(req, res) {
 
 module.exports = {
   router,
-  trackingHandler,
   criarEventoRemessaHandler,
   SELECT_PEDIDO,
   mapPedidoRow,

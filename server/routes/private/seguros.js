@@ -1,5 +1,6 @@
 const express = require('express');
-const db = require('../db');
+const db = require('../../db');
+const { requireAdmin } = require('../../middleware/auth');
 
 const categoriasRouter = express.Router();
 const seguradorasRouter = express.Router();
@@ -18,7 +19,7 @@ categoriasRouter.get('/', (req, res) => {
   res.json(rows);
 });
 
-categoriasRouter.post('/', (req, res) => {
+categoriasRouter.post('/', requireAdmin, (req, res) => {
   const { id_categoria, descricao } = req.body || {};
   if (typeof descricao !== 'string' || !descricao.trim()) {
     return res.status(400).json({ error: 'Descrição da categoria é obrigatória.' });
@@ -47,7 +48,7 @@ categoriasRouter.post('/', (req, res) => {
   res.status(201).json(db.get('SELECT * FROM CATEGORIA_PRODUTO WHERE id_categoria = ?', id));
 });
 
-categoriasRouter.put('/:id', (req, res) => {
+categoriasRouter.put('/:id', requireAdmin, (req, res) => {
   const atual = db.get('SELECT * FROM CATEGORIA_PRODUTO WHERE id_categoria = ?', req.params.id);
   if (!atual) return res.status(404).json({ error: 'Categoria não encontrada.' });
 
@@ -72,7 +73,7 @@ categoriasRouter.put('/:id', (req, res) => {
   res.json(db.get('SELECT * FROM CATEGORIA_PRODUTO WHERE id_categoria = ?', atual.id_categoria));
 });
 
-categoriasRouter.delete('/:id', (req, res) => {
+categoriasRouter.delete('/:id', requireAdmin, (req, res) => {
   const atual = db.get('SELECT * FROM CATEGORIA_PRODUTO WHERE id_categoria = ?', req.params.id);
   if (!atual) return res.status(404).json({ error: 'Categoria não encontrada.' });
 
@@ -107,7 +108,7 @@ seguradorasRouter.get('/', (req, res) => {
   res.json(rows);
 });
 
-seguradorasRouter.post('/', (req, res) => {
+seguradorasRouter.post('/', requireAdmin, (req, res) => {
   const { razao_social, contato } = req.body || {};
   if (typeof razao_social !== 'string' || !razao_social.trim()) {
     return res.status(400).json({ error: 'Razão social da seguradora é obrigatória.' });
@@ -135,7 +136,7 @@ seguradorasRouter.post('/', (req, res) => {
   res.status(201).json(db.get('SELECT * FROM SEGURADORA WHERE id_seguradora = ?', id));
 });
 
-seguradorasRouter.put('/:id', (req, res) => {
+seguradorasRouter.put('/:id', requireAdmin, (req, res) => {
   const atual = db.get('SELECT * FROM SEGURADORA WHERE id_seguradora = ?', req.params.id);
   if (!atual) return res.status(404).json({ error: 'Seguradora não encontrada.' });
 
@@ -165,7 +166,7 @@ seguradorasRouter.put('/:id', (req, res) => {
   res.json(db.get('SELECT * FROM SEGURADORA WHERE id_seguradora = ?', atual.id_seguradora));
 });
 
-seguradorasRouter.delete('/:id', (req, res) => {
+seguradorasRouter.delete('/:id', requireAdmin, (req, res) => {
   const atual = db.get('SELECT * FROM SEGURADORA WHERE id_seguradora = ?', req.params.id);
   if (!atual) return res.status(404).json({ error: 'Seguradora não encontrada.' });
 
@@ -300,7 +301,7 @@ apolicesRouter.post('/', (req, res) => {
 apolicesRouter.put('/:id', (req, res) => {
   const atual = db.get(`${SELECT_APOLICE} WHERE a.id_apolice = ?`, req.params.id);
   if (!atual) return res.status(404).json({ error: 'Apólice não encontrada.' });
-  if (!req.user.isAdmin && atual.id_cliente && atual.id_cliente !== req.user.cliente_id_cliente) {
+  if (!req.user.isAdmin && atual.id_cliente !== req.user.cliente_id_cliente) {
     return res.status(403).json({ error: 'Acesso negado a esta apólice.' });
   }
 

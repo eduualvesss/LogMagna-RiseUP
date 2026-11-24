@@ -1,5 +1,5 @@
 const express = require('express');
-const db = require('../db');
+const db = require('../../db');
 
 const notificacoesRouter = express.Router();
 const atendimentosRouter = express.Router();
@@ -55,6 +55,15 @@ notificacoesRouter.post('/', (req, res) => {
   }
   if (db.temHtmlInseguro([cliente_id_cliente, tipo, canal, id_ocorrencia])) {
     return res.status(400).json({ error: 'Caracteres HTML (< ou >) não são permitidos.' });
+  }
+
+  if (
+    typeof cliente_id_cliente === 'string' &&
+    cliente_id_cliente.trim() &&
+    cliente_id_cliente.trim() !== req.user.cliente_id_cliente &&
+    !req.user.isAdmin
+  ) {
+    return res.status(403).json({ error: 'Apenas administradores podem notificar outros clientes.' });
   }
 
   const clienteAlvo =
@@ -137,6 +146,26 @@ notificacoesRouter.post('/marcar-todas-lidas', (req, res) => {
     });
   });
   res.json({ ok: true });
+});
+
+notificacoesRouter.delete('/:id', (req, res) => {
+  const atual = db.get('SELECT * FROM NOTIFICACAO WHERE id_notificacao = ?', req.params.id);
+  if (!atual) return res.status(404).json({ error: 'Notificação não encontrada.' });
+  if (!req.user.isAdmin && atual.cliente_id_cliente !== req.user.cliente_id_cliente) {
+    return res.status(403).json({ error: 'Acesso negado a esta notificação.' });
+  }
+
+  db.transaction(() => {
+    db.run('DELETE FROM NOTIFICACAO WHERE id_notificacao = ?', atual.id_notificacao);
+    db.registrarAuditoria({
+      idUsuario: req.user.id_usuario,
+      entidade: 'NOTIFICACAO',
+      idRegistro: atual.id_notificacao,
+      acao: 'EXCLUIR',
+    });
+  });
+
+  res.status(204).end();
 });
 
 // ---------------- ATENDIMENTO ----------------
@@ -330,7 +359,7 @@ feedbacksRouter.post('/', (req, res) => {
       relato_problema.trim().slice(0, 255),
       typeof solucao_esperada === 'string' ? solucao_esperada.trim().slice(0, 255) : '',
       typeof nivel_compreensao_seguro === 'string' ? nivel_compreensao_seguro.trim().slice(0, 50) : 'Médio',
-      typeof momento_conhecimento_seguro === 'string' ? momento_conhecimento_seguro.trim().slice(0, 120) : 'No checkout',
+      typeof momento_conhecimento_seguro === 'string' ? momento_conhecimento_seguro.trim().slice(0, 120) : 'No checkout da compra',
       typeof aceita_assistente_virtual === 'string' ? aceita_assistente_virtual.trim().slice(0, 50) : 'Sim'
     );
     db.registrarAuditoria({

@@ -1,5 +1,5 @@
 const express = require('express');
-const db = require('../db');
+const db = require('../../db');
 
 const ocorrenciasRouter = express.Router();
 const sinistrosRouter = express.Router();
@@ -131,20 +131,28 @@ const SELECT_SINISTRO = `
 
 function anexarDocumentos(sinistros) {
   if (!sinistros.length) return [];
-  return sinistros.map((s) => {
-    const docs = db.all(
-      `SELECT id_documento, id_sinistro, tipo, arquivo, data_envio, validado
-       FROM DOCUMENTO
-       WHERE id_sinistro = ?
-       ORDER BY data_envio DESC`,
-      s.id_sinistro
-    );
-    return {
-      ...s,
-      valor_indenizado: s.valor_indenizado != null ? Number(s.valor_indenizado) : null,
-      documentos: docs.map((d) => ({ ...d, validado: Boolean(d.validado) })),
-    };
-  });
+  const ids = sinistros.map((s) => s.id_sinistro);
+  const placeholders = ids.map(() => '?').join(', ');
+  const todosDocs = db.all(
+    `SELECT id_documento, id_sinistro, tipo, arquivo, data_envio, validado
+     FROM DOCUMENTO
+     WHERE id_sinistro IN (${placeholders})
+     ORDER BY data_envio DESC`,
+    ...ids
+  );
+
+  const docsPorSinistro = new Map();
+  for (const d of todosDocs) {
+    const lista = docsPorSinistro.get(d.id_sinistro) || [];
+    lista.push({ ...d, validado: Boolean(d.validado) });
+    docsPorSinistro.set(d.id_sinistro, lista);
+  }
+
+  return sinistros.map((s) => ({
+    ...s,
+    valor_indenizado: s.valor_indenizado != null ? Number(s.valor_indenizado) : null,
+    documentos: docsPorSinistro.get(s.id_sinistro) || [],
+  }));
 }
 
 sinistrosRouter.get('/', (req, res) => {
@@ -393,6 +401,9 @@ documentosRouter.patch('/:id', (req, res) => {
   }
 
   const { validado, tipo, arquivo } = req.body || {};
+  if (validado !== undefined && !req.user.isAdmin) {
+    return res.status(403).json({ error: 'Apenas administradores podem validar ou invalidar documentos.' });
+  }
   if (db.temHtmlInseguro([tipo, arquivo])) {
     return res.status(400).json({ error: 'Caracteres HTML (< ou >) não são permitidos.' });
   }

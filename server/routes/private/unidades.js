@@ -1,5 +1,6 @@
 const express = require('express');
-const db = require('./db');
+const db = require('../../db');
+const { requireAdmin } = require('../../middleware/auth');
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ function validar(corpo) {
 }
 
 const SELECT_BASE = `
-  SELECT id_unidade AS id, id_unidade, nome, tipo, cidade, estado, status, version
+  SELECT id_unidade, nome, tipo, cidade, estado, status, version
   FROM UNIDADE
 `;
 
@@ -54,19 +55,19 @@ router.get('/', (req, res) => {
 // GET /api/unidades/:id
 router.get('/:id', (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) return res.status(404).json({ erro: 'Unidade não encontrada.' });
+  if (!Number.isInteger(id) || id <= 0) return res.status(404).json({ error: 'Unidade não encontrada.' });
   const unidade = db.get(`${SELECT_BASE} WHERE id_unidade = ?`, id);
-  if (!unidade) return res.status(404).json({ erro: 'Unidade não encontrada.' });
+  if (!unidade) return res.status(404).json({ error: 'Unidade não encontrada.' });
   res.json(unidade);
 });
 
 // POST /api/unidades
-router.post('/', (req, res) => {
-  const erro = validar(req.body);
-  if (erro) return res.status(400).json({ erro });
+router.post('/', requireAdmin, (req, res) => {
+  const error = validar(req.body);
+  if (error) return res.status(400).json({ error });
 
   const { nome, tipo, cidade, estado, status } = req.body;
-  const info = db.transaction(() => {
+  const idInserido = db.transaction(() => {
     const result = db.run(
       `INSERT INTO UNIDADE (nome, tipo, cidade, estado, status, version)
        VALUES (?, ?, ?, ?, ?, 1)`,
@@ -76,34 +77,34 @@ router.post('/', (req, res) => {
       estado.trim().toUpperCase(),
       status
     );
-    const idInserido = Number(result.lastInsertRowid);
+    const idNovo = Number(result.lastInsertRowid);
     db.registrarAuditoria({
       idUsuario: req.user?.id_usuario,
       entidade: 'UNIDADE',
-      idRegistro: String(idInserido),
+      idRegistro: String(idNovo),
       acao: 'CRIAR',
     });
-    return idInserido;
+    return idNovo;
   });
 
-  const nova = db.get(`${SELECT_BASE} WHERE id_unidade = ?`, info);
+  const nova = db.get(`${SELECT_BASE} WHERE id_unidade = ?`, idInserido);
   res.status(201).json(nova);
 });
 
 // PUT /api/unidades/:id
-router.put('/:id', (req, res) => {
+router.put('/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) return res.status(404).json({ erro: 'Unidade não encontrada.' });
+  if (!Number.isInteger(id) || id <= 0) return res.status(404).json({ error: 'Unidade não encontrada.' });
 
   const atual = db.get(`${SELECT_BASE} WHERE id_unidade = ?`, id);
-  if (!atual) return res.status(404).json({ erro: 'Unidade não encontrada.' });
+  if (!atual) return res.status(404).json({ error: 'Unidade não encontrada.' });
 
-  const erro = validar(req.body);
-  if (erro) return res.status(400).json({ erro });
+  const error = validar(req.body);
+  if (error) return res.status(400).json({ error });
 
   if (req.body.version !== undefined && Number(req.body.version) !== atual.version) {
     return res.status(409).json({
-      erro: 'Conflito de edição: esta unidade foi alterada por outro operador. Recarregue os dados.',
+      error: 'Conflito de edição: esta unidade foi alterada por outro operador. Recarregue os dados.',
     });
   }
 
@@ -136,12 +137,12 @@ router.put('/:id', (req, res) => {
 });
 
 // DELETE /api/unidades/:id
-router.delete('/:id', (req, res) => {
+router.delete('/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) return res.status(404).json({ erro: 'Unidade não encontrada.' });
+  if (!Number.isInteger(id) || id <= 0) return res.status(404).json({ error: 'Unidade não encontrada.' });
 
   const atual = db.get('SELECT id_unidade FROM UNIDADE WHERE id_unidade = ?', id);
-  if (!atual) return res.status(404).json({ erro: 'Unidade não encontrada.' });
+  if (!atual) return res.status(404).json({ error: 'Unidade não encontrada.' });
 
   db.transaction(() => {
     db.run('DELETE FROM UNIDADE WHERE id_unidade = ?', id);
