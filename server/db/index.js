@@ -2,19 +2,24 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { DatabaseSync } = require('node:sqlite');
-const { seedIfEmpty, RATE } = require('./seed');
+const { DB_PATH } = require('../config/env');
+const { bootstrapCatalogo, RATE } = require('./bootstrap');
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'magna.db');
-const isMemory = dbPath === ':memory:';
+const isMemory = DB_PATH === ':memory:';
 
 if (!isMemory) {
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 }
 
-const sqlite = new DatabaseSync(dbPath);
+const sqlite = new DatabaseSync(DB_PATH);
 sqlite.exec('PRAGMA foreign_keys = ON;');
+sqlite.exec('PRAGMA busy_timeout = 5000;');
+sqlite.exec('PRAGMA temp_store = MEMORY;');
+sqlite.exec('PRAGMA cache_size = -16000;');
+
 if (!isMemory) {
   sqlite.exec('PRAGMA journal_mode = WAL;');
+  sqlite.exec('PRAGMA synchronous = NORMAL;');
 }
 
 const schemaPath = path.join(__dirname, '..', '..', 'database', 'schema.sqlite.sql');
@@ -71,7 +76,7 @@ function registrarAuditoria({ idUsuario, entidade, idRegistro, acao, dataHora })
 }
 
 const api = {
-  dbPath,
+  dbPath: DB_PATH,
   RATE,
   sqlite,
   all,
@@ -84,6 +89,6 @@ const api = {
   registrarAuditoria,
 };
 
-seedIfEmpty(api);
+bootstrapCatalogo(api);
 
 module.exports = api;

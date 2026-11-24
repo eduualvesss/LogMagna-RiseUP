@@ -1,8 +1,20 @@
 const crypto = require('crypto');
 
 /**
+ * Valida politica minima de senha forte (>= 8 caracteres, ao menos 1 letra e 1 numero).
+ */
+function validarForcaSenha(senha) {
+  if (typeof senha !== 'string') return 'Informe uma senha válida.';
+  if (senha.length < 8) return 'A senha deve ter pelo menos 8 caracteres.';
+  if (senha.length > 128) return 'A senha deve ter no máximo 128 caracteres.';
+  if (!/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(senha) || !/\d/.test(senha)) {
+    return 'A senha deve conter pelo menos uma letra e um número.';
+  }
+  return null;
+}
+
+/**
  * Gera hash scrypt no formato `scrypt$<salt>$<hex>`.
- * Aceita salt fixo opcional para seeds deterministicas.
  */
 function hashSenha(senha, saltFixo) {
   const salt = saltFixo || crypto.randomBytes(16).toString('hex');
@@ -28,4 +40,4 @@ function verificarSenha(tentativa, hashSalvo) {
   }
 }
 
-module.exports = { hashSenha, verificarSenha };
+module.exports = { validarForcaSenha, hashSenha, verificarSenha };
