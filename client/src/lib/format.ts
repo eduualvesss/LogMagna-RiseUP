@@ -34,3 +34,13 @@ export function formatarDataHora(iso?: string | null): string {
     minute: '2-digit',
   });
 }
+
+export type BadgeVariant = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'brand';
+
+export function statusBadgeVariant(status: string, retido?: boolean): BadgeVariant {
+  if (retido || status === 'Retido' || status === 'Documentação pendente') return 'warning';
+  if (status === 'Em trânsito' || status === 'Aprovado' || status === 'Indenizado') return 'success';
+  if (status === 'Cancelado') return 'danger';
+  if (status === 'Entregue' || status === 'Encerrado' || status === 'Não acionado') return 'neutral';
+  return 'info';
+}
