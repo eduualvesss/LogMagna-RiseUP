@@ -21,6 +21,12 @@ pnpm-debug.log*
 .env.*.local
 *.local
 
+# SQLite local database
+server/data/
+*.db
+*.db-wal
+*.db-shm
+
 # Editor & System
 .vscode/*
 !.vscode/extensions.json

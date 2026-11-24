@@ -9,15 +9,42 @@ export { API_URL };
 const STORAGE_KEY = 'logmagna.session';
 
 export interface User {
-  id: number;
+  id: string;
+  id_usuario?: string;
   nome: string;
+  nome_completo?: string;
   email: string;
+  email_corporativo?: string;
   papel: string;
+  perfil?: string;
+  ativo?: boolean;
+  data_cadastro?: string;
+  cliente_id_cliente?: string | null;
+}
+
+export interface ClientePerfil {
+  id_cliente: string;
+  id_usuario: string;
+  data_nascimento: string | null;
+  nome_completo: string;
+  tipo_vinculo: string | null;
+  frequencia_compra: string | null;
+  faixa_gasto_medio: string | null;
 }
 
 export interface Session {
   token: string;
   user: User;
+}
+
+export interface RegisterPayload {
+  nome_completo: string;
+  email_corporativo: string;
+  password: string;
+  data_nascimento?: string;
+  tipo_vinculo?: string;
+  frequencia_compra?: string;
+  faixa_gasto_medio?: string;
 }
 
 export async function login(email: string, password: string): Promise<Session> {
@@ -33,6 +60,22 @@ export async function login(email: string, password: string): Promise<Session> {
   }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || 'Falha ao entrar.');
+  return json as Session;
+}
+
+export async function register(payload: RegisterPayload): Promise<Session> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error('Não foi possível conectar ao servidor.');
+  }
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'Falha ao criar cadastro.');
   return json as Session;
 }
 
@@ -76,7 +119,8 @@ async function validate(session: Session): Promise<User | null> {
   try {
     const res = await fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${session.token}` } });
     if (!res.ok) return null;
-    return (await res.json()).user as User;
+    const data = await res.json();
+    return data.user as User;
   } catch {
     // servidor fora do ar: mantem a sessao local para nao deslogar a toa
     return session.user;

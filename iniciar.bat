@@ -4,7 +4,7 @@ echo ========================================================
 echo               INICIANDO LOGMAGNA
 echo ========================================================
 echo Backend API : http://localhost:3001
-echo Frontend    : http://localhost:5173
+echo Frontend    : http://localhost:3000
 echo ========================================================
 echo.
 cd /d "%~dp0"

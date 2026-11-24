@@ -169,12 +169,14 @@ export default function LoginForm() {
             </button>
 
             <p className="mt-6 text-xs text-gray-400 text-center">
-              Demonstração: <span className="font-medium text-gray-500">cliente@logmagna.com</span> / <span className="font-medium text-gray-500">logmagna123</span>
+              Cliente: <span className="font-medium text-gray-500">cliente@logmagna.com</span> • Admin:{' '}
+              <span className="font-medium text-gray-500">admin@logmagna.com</span> (senha:{' '}
+              <span className="font-medium text-gray-500">logmagna123</span>)
             </p>
           </div>
 
           <p className="text-center text-sm text-gray-500 mt-6">
-            Ainda não tem conta? <Link href="/add" className="text-[#3f6b4d] font-medium hover:text-[#1a3326]">Criar cadastro</Link>
+            Ainda não tem conta? <Link href="/cadastro" className="text-[#3f6b4d] font-medium hover:text-[#1a3326]">Criar cadastro</Link>
           </p>
         </div>
       </main>
