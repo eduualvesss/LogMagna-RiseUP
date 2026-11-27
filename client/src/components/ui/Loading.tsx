@@ -31,6 +31,19 @@ export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: nu
   );
 }
 
+export function ListSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="space-y-3" aria-busy="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-3">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-3.5 w-3/4" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function PageSkeleton() {
   return (
     <div className="flex bg-[#f8faf9] min-h-screen" aria-busy="true">

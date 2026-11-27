@@ -218,6 +218,8 @@ export default function CadastroForm() {
                       <option value="Pessoa Física">Pessoa Física</option>
                       <option value="MEI / Pequeno Negócio">MEI / Pequeno Negócio</option>
                       <option value="Corporativo">Corporativo</option>
+                      <option value="E-commerce">E-commerce</option>
+                      <option value="Marketplace">Marketplace</option>
                     </select>
                   </div>
                 </div>

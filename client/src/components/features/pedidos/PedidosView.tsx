@@ -26,6 +26,7 @@ export default function PedidosView() {
   const [erroAcao, setErroAcao] = useState('');
 
   const [selecionado, setSelecionado] = useState<PedidoItem | null>(null);
+  const [pedidoExcluir, setPedidoExcluir] = useState<PedidoItem | null>(null);
   const [editStatus, setEditStatus] = useState('Aguardando');
   const [editRetido, setEditRetido] = useState(false);
   const [editMotivo, setEditMotivo] = useState('');
@@ -61,20 +62,26 @@ export default function PedidosView() {
     }
   }
 
-  async function handleExcluir(p: PedidoItem) {
+  async function confirmarExcluirPedido() {
+    if (!pedidoExcluir) return;
+    setSalvando(true);
     setErroAcao('');
     setMsg('');
     try {
-      await excluirPedido(p.id_pedido);
-      setMsg(`Pedido ${p.id_pedido} excluído.`);
+      await excluirPedido(pedidoExcluir.id_pedido);
+      setMsg(`Pedido ${pedidoExcluir.id_pedido} excluído.`);
+      setPedidoExcluir(null);
     } catch (err) {
       setErroAcao(err instanceof Error ? err.message : 'Não foi possível excluir o pedido.');
+      setPedidoExcluir(null);
+    } finally {
+      setSalvando(false);
     }
   }
 
   const termo = busca.trim().toLowerCase();
   const filtrados = pedidos.filter((p) => {
-    if (aba === 'ativos' && p.status === 'Entregue') return false;
+    if (aba === 'ativos' && (p.status === 'Entregue' || p.status === 'Cancelado')) return false;
     if (aba === 'entregues' && p.status !== 'Entregue') return false;
     if (aba === 'retidos' && !p.retido_analise) return false;
     if (filtroCat && p.id_categoria !== filtroCat) return false;
@@ -125,7 +132,7 @@ export default function PedidosView() {
         onChange={setAba}
         items={[
           { id: 'todos', label: 'Todos', count: pedidos.length },
-          { id: 'ativos', label: 'Ativos', count: pedidos.filter((p) => p.status !== 'Entregue').length },
+          { id: 'ativos', label: 'Ativos', count: pedidos.filter((p) => p.status !== 'Entregue' && p.status !== 'Cancelado').length },
           { id: 'entregues', label: 'Entregues', count: pedidos.filter((p) => p.status === 'Entregue').length },
           { id: 'retidos', label: 'Retidos', count: pedidos.filter((p) => p.retido_analise).length },
         ]}
@@ -241,7 +248,7 @@ export default function PedidosView() {
                         </Link>
                       )}
                       <button
-                        onClick={() => void handleExcluir(p)}
+                        onClick={() => setPedidoExcluir(p)}
                         className="text-xs font-medium text-red-600 hover:underline inline-flex items-center gap-0.5"
                         title="Excluir pedido (sem ocorrências/atendimentos)"
                       >
@@ -328,6 +335,34 @@ export default function PedidosView() {
             </form>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={Boolean(pedidoExcluir)}
+        onClose={() => setPedidoExcluir(null)}
+        title="Confirmar exclusão"
+      >
+        <p className="text-sm text-slate-600">
+          Deseja excluir o pedido <strong className="text-slate-900">{pedidoExcluir?.nome_produto}</strong> ({pedidoExcluir?.id_pedido})?
+          Essa ação também remove a remessa e a apólice sem vínculo.
+        </p>
+        <div className="mt-5 flex justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => setPedidoExcluir(null)}
+            className="px-4 py-2 border border-slate-200 rounded-xl text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={salvando}
+            onClick={confirmarExcluirPedido}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {salvando && <Spinner size={14} />} Excluir pedido
+          </button>
+        </div>
       </Modal>
     </div>
   );

@@ -17,11 +17,11 @@ import { useNotificacoesHeader } from '@/hooks/notificacoes-context';
 import { useSinistros } from '@/hooks/useSinistros';
 import { brl, formatarData, formatarDataHora, statusBadgeVariant } from '@/lib/format';
 import { sinistrosService } from '@/services/sinistros.service';
-import type { SinistroItem } from '@/types';
+import type { DocumentoItem, SinistroItem } from '@/types';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Spinner, TableSkeleton } from '@/components/ui/Loading';
+import { ListSkeleton, Spinner } from '@/components/ui/Loading';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
@@ -55,6 +55,7 @@ export default function SinistrosView() {
   const [modalDocSinistro, setModalDocSinistro] = useState<SinistroItem | null>(null);
   const [docTipo, setDocTipo] = useState('Nota Fiscal');
   const [docArquivo, setDocArquivo] = useState('');
+  const [docExcluir, setDocExcluir] = useState<DocumentoItem | null>(null);
 
   const remessasDisponiveis = pedidos.filter((p) => Boolean(p.id_remessa));
 
@@ -80,7 +81,7 @@ export default function SinistrosView() {
   function abrirEditarSinistro(s: SinistroItem) {
     setEditSinistroId(s.id_sinistro);
     setSinIdOcorrencia(s.ocorrencia_id_ocorrencia);
-    setSinStatus(s.status);
+    setSinStatus(s.status === 'Em Análise' ? 'Em análise' : s.status);
     setSinValor(s.valor_indenizado != null ? String(s.valor_indenizado) : '');
     setSinEtapa(s.etapa_mais_dificil || '');
     setSinMotivo(s.motivo_nao_acionamento || '');
@@ -180,15 +181,21 @@ export default function SinistrosView() {
     }
   }
 
-  async function removerDocumento(idDoc: string) {
+  async function confirmarRemoverDocumento() {
+    if (!docExcluir) return;
+    setSalvando(true);
     setErroAcao('');
     setMsg('');
     try {
-      await sinistrosService.deleteDocumento(idDoc);
+      await sinistrosService.deleteDocumento(docExcluir.id_documento);
       setMsg('Documento removido do dossiê.');
+      setDocExcluir(null);
       await recarregar();
     } catch (err) {
       setErroAcao(err instanceof Error ? err.message : 'Falha ao remover documento.');
+      setDocExcluir(null);
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -235,7 +242,7 @@ export default function SinistrosView() {
       />
 
       {loading ? (
-        <TableSkeleton rows={4} />
+        <ListSkeleton rows={4} />
       ) : aba === 'sinistros' ? (
         sinistros.length === 0 ? (
           <EmptyState
@@ -370,7 +377,7 @@ export default function SinistrosView() {
                             ) : null}
                             <button
                               type="button"
-                              onClick={() => removerDocumento(doc.id_documento)}
+                              onClick={() => setDocExcluir(doc)}
                               className="rounded-md border border-gray-200 p-1 text-gray-500 hover:bg-red-50 hover:text-red-700"
                               title="Remover documento"
                             >
@@ -518,10 +525,12 @@ export default function SinistrosView() {
               <label className="label-field">Status do sinistro</label>
               <select className="input-field" value={sinStatus} onChange={(e) => setSinStatus(e.target.value)}>
                 <option value="Aberto">Aberto</option>
-                <option value="Em Análise">Em Análise</option>
+                <option value="Em análise">Em análise</option>
+                <option value="Documentação pendente">Documentação pendente</option>
                 <option value="Aprovado">Aprovado</option>
                 <option value="Indenizado">Indenizado</option>
                 <option value="Negado">Negado</option>
+                <option value="Não acionado">Não acionado</option>
                 <option value="Encerrado">Encerrado</option>
               </select>
             </div>
@@ -610,6 +619,31 @@ export default function SinistrosView() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(docExcluir)}
+        onClose={() => setDocExcluir(null)}
+        title="Confirmar exclusão"
+      >
+        <p className="text-sm text-gray-600">
+          Deseja remover o documento <strong className="text-gray-900">{docExcluir?.tipo}</strong> (
+          <span className="font-mono text-xs">{docExcluir?.arquivo}</span>)? Essa ação não pode ser desfeita.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={() => setDocExcluir(null)} className="btn-secondary">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={salvando}
+            onClick={confirmarRemoverDocumento}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {salvando ? <Spinner className="h-4 w-4 text-white" /> : null}
+            Remover documento
+          </button>
+        </div>
       </Modal>
     </div>
   );

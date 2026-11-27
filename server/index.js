@@ -8,26 +8,71 @@ const privateRoutes = require('./routes/private');
 
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
 app.use(securityHeaders);
 
 const ORIGEM_LOCAL_RE =
   /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/i;
 
 app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true);
-      if (CLIENT_ORIGINS.length > 0) {
-        return callback(null, CLIENT_ORIGINS.includes(origin));
-      }
-      if (!IS_PROD && ORIGEM_LOCAL_RE.test(origin)) {
-        return callback(null, true);
-      }
-      return callback(null, origin === 'http://localhost:3000');
-    },
+  cors((req, callback) => {
+    const origin = req.headers.origin;
+    if (!origin) return callback(null, { origin: true });
+
+    if (CLIENT_ORIGINS.length > 0 && CLIENT_ORIGINS.includes(origin)) {
+      return callback(null, { origin: true });
+    }
+    const reqHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    if (reqHost && (origin === `https://${reqHost}` || origin === `http://${reqHost}`)) {
+      return callback(null, { origin: true });
+    }
+    if (!IS_PROD && ORIGEM_LOCAL_RE.test(origin)) {
+      return callback(null, { origin: true });
+    }
+    if (origin === 'http://localhost:3000') {
+      return callback(null, { origin: true });
+    }
+    return callback(null, { origin: false });
   })
 );
 app.use(express.json({ limit: '100kb' }));
+
+// Sincronizacao transparente com Vercel Private Blob antes e depois de cada requisicao
+app.use('/api', (req, res, next) => {
+  const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+  db.syncBeforeRequest(isWrite)
+    .then(() => {
+      const origJson = res.json.bind(res);
+      const origEnd = res.end.bind(res);
+      let flushed = false;
+
+      const ensureFlush = () => {
+        if (flushed || !db.isDirty()) return Promise.resolve();
+        flushed = true;
+        return db.flushAfterRequest();
+      };
+
+      res.json = (body) => {
+        ensureFlush()
+          .catch((err) => console.error('Erro ao persistir banco:', err))
+          .finally(() => origJson(body));
+        return res;
+      };
+
+      res.end = (chunk, encoding, callback) => {
+        if (flushed || !db.isDirty()) {
+          return origEnd(chunk, encoding, callback);
+        }
+        ensureFlush()
+          .catch((err) => console.error('Erro ao persistir banco:', err))
+          .finally(() => origEnd(chunk, encoding, callback));
+        return res;
+      };
+
+      next();
+    })
+    .catch(next);
+});
 
 // Separação explícita de rotas públicas e rotas privadas (autenticadas)
 app.use('/api', publicRoutes);

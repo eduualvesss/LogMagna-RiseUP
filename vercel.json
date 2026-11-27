@@ -1,0 +1,15 @@
+{
+  "services": {
+    "frontend": {
+      "root": "client"
+    },
+    "backend": {
+      "root": "server",
+      "entrypoint": "index.js"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "backend" } },
+    { "source": "/(.*)", "destination": { "service": "frontend" } }
+  ]
+}

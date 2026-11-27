@@ -18,14 +18,121 @@ import { useAuditoria } from '@/hooks/useAuditoria';
 import { formatarData, formatarDataHora } from '@/lib/format';
 import { adminService } from '@/services/admin.service';
 import { segurosService } from '@/services/seguros.service';
-import type { CategoriaItem, UsuarioAdminItem } from '@/types';
+import type {
+  CategoriaItem,
+  ClientePerfil,
+  UpdateProfilePayload,
+  User,
+  UsuarioAdminItem,
+} from '@/types';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Spinner, TableSkeleton } from '@/components/ui/Loading';
+import { ListSkeleton, Spinner } from '@/components/ui/Loading';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
+
+function PerfilDadosForm({
+  user,
+  cliente,
+  salvando,
+  onSave,
+}: {
+  user: User | null;
+  cliente: ClientePerfil | null;
+  salvando: boolean;
+  onSave: (payload: UpdateProfilePayload) => Promise<void>;
+}) {
+  const [nomePerfil, setNomePerfil] = useState(user?.nome_completo || '');
+  const [nascimento, setNascimento] = useState(cliente?.data_nascimento || '');
+  const [vinculo, setVinculo] = useState(cliente?.tipo_vinculo || 'Corporativo');
+  const [frequencia, setFrequencia] = useState(cliente?.frequencia_compra || 'Mensal');
+  const [gasto, setGasto] = useState(cliente?.faixa_gasto_medio || 'R$ 500 a R$ 1.500');
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    await onSave({
+      nome_completo: nomePerfil.trim(),
+      data_nascimento: nascimento || undefined,
+      tipo_vinculo: vinculo,
+      frequencia_compra: frequencia,
+      faixa_gasto_medio: gasto,
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="card-surface space-y-4 p-6">
+      <div>
+        <h2 className="text-base font-bold text-gray-900">Dados cadastrais</h2>
+        <p className="text-xs text-gray-500">
+          E-mail corporativo: <strong className="text-gray-700">{user?.email_corporativo}</strong>
+        </p>
+      </div>
+
+      <div>
+        <label className="label-field">Nome completo</label>
+        <input
+          type="text"
+          className="input-field"
+          value={nomePerfil}
+          onChange={(e) => setNomePerfil(e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label-field">Data de nascimento</label>
+          <input
+            type="date"
+            className="input-field"
+            value={nascimento}
+            onChange={(e) => setNascimento(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="label-field">Tipo de vínculo</label>
+          <select className="input-field" value={vinculo} onChange={(e) => setVinculo(e.target.value)}>
+            <option value="Pessoa Física">Pessoa Física</option>
+            <option value="MEI / Pequeno Negócio">MEI / Pequeno Negócio</option>
+            <option value="Corporativo">Corporativo</option>
+            <option value="E-commerce">E-commerce</option>
+            <option value="Marketplace">Marketplace</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label-field">Frequência de envios</label>
+          <select className="input-field" value={frequencia} onChange={(e) => setFrequencia(e.target.value)}>
+            <option value="Semanal">Semanal</option>
+            <option value="Quinzenal">Quinzenal</option>
+            <option value="Mensal">Mensal</option>
+            <option value="Eventual">Eventual</option>
+          </select>
+        </div>
+        <div>
+          <label className="label-field">Faixa de valor médio</label>
+          <select className="input-field" value={gasto} onChange={(e) => setGasto(e.target.value)}>
+            <option value="Até R$ 500">Até R$ 500</option>
+            <option value="R$ 500 a R$ 1.500">R$ 500 a R$ 1.500</option>
+            <option value="R$ 1.500 a R$ 5.000">R$ 1.500 a R$ 5.000</option>
+            <option value="Acima de R$ 5.000">Acima de R$ 5.000</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="pt-2">
+        <button type="submit" disabled={salvando} className="btn-primary">
+          {salvando ? <Spinner className="h-4 w-4 text-white" /> : null}
+          Salvar dados cadastrais
+        </button>
+      </div>
+    </form>
+  );
+}
 
 export default function AuditoriaView() {
   const { user, cliente, isAdmin, updateProfile, changePassword } = useAuth();
@@ -39,13 +146,6 @@ export default function AuditoriaView() {
   const [erroAcao, setErroAcao] = useState('');
   const [msg, setMsg] = useState('');
   const [salvando, setSalvando] = useState(false);
-
-  // Perfil
-  const [nomePerfil, setNomePerfil] = useState(user?.nome_completo || '');
-  const [nascimento, setNascimento] = useState(cliente?.data_nascimento || '');
-  const [vinculo, setVinculo] = useState(cliente?.tipo_vinculo || 'Corporativo');
-  const [frequencia, setFrequencia] = useState(cliente?.frequencia_compra || 'Mensal');
-  const [gasto, setGasto] = useState(cliente?.faixa_gasto_medio || 'R$ 500 - R$ 2.500');
 
   // Senha
   const [senhaAtual, setSenhaAtual] = useState('');
@@ -64,20 +164,14 @@ export default function AuditoriaView() {
   const [modalCat, setModalCat] = useState(false);
   const [editCat, setEditCat] = useState<CategoriaItem | null>(null);
   const [catDesc, setCatDesc] = useState('');
+  const [categoriaExcluir, setCategoriaExcluir] = useState<CategoriaItem | null>(null);
 
-  async function salvarPerfil(e: FormEvent) {
-    e.preventDefault();
+  async function salvarPerfil(payload: UpdateProfilePayload) {
     setSalvando(true);
     setErroAcao('');
     setMsg('');
     try {
-      await updateProfile({
-        nome_completo: nomePerfil.trim(),
-        data_nascimento: nascimento || undefined,
-        tipo_vinculo: vinculo,
-        frequencia_compra: frequencia,
-        faixa_gasto_medio: gasto,
-      });
+      await updateProfile(payload);
       setMsg('Dados cadastrais atualizados com sucesso.');
       await recarregar();
     } catch (err) {
@@ -196,15 +290,21 @@ export default function AuditoriaView() {
     }
   }
 
-  async function removerCategoria(c: CategoriaItem) {
+  async function confirmarExclusaoCategoria() {
+    if (!categoriaExcluir) return;
+    setSalvando(true);
     setErroAcao('');
     setMsg('');
     try {
-      await segurosService.deleteCategoria(c.id_categoria);
-      setMsg(`Categoria "${c.descricao}" removida.`);
+      await segurosService.deleteCategoria(categoriaExcluir.id_categoria);
+      setMsg(`Categoria "${categoriaExcluir.descricao}" removida.`);
+      setCategoriaExcluir(null);
       await recarregar();
     } catch (err) {
       setErroAcao(err instanceof Error ? err.message : 'Não foi possível remover a categoria.');
+      setCategoriaExcluir(null);
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -239,73 +339,13 @@ export default function AuditoriaView() {
 
       {aba === 'perfil' ? (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <form onSubmit={salvarPerfil} className="card-surface space-y-4 p-6">
-            <div>
-              <h2 className="text-base font-bold text-gray-900">Dados cadastrais</h2>
-              <p className="text-xs text-gray-500">
-                E-mail corporativo: <strong className="text-gray-700">{user?.email_corporativo}</strong>
-              </p>
-            </div>
-
-            <div>
-              <label className="label-field">Nome completo</label>
-              <input
-                type="text"
-                className="input-field"
-                value={nomePerfil}
-                onChange={(e) => setNomePerfil(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="label-field">Data de nascimento</label>
-                <input
-                  type="date"
-                  className="input-field"
-                  value={nascimento}
-                  onChange={(e) => setNascimento(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="label-field">Tipo de vínculo</label>
-                <select className="input-field" value={vinculo} onChange={(e) => setVinculo(e.target.value)}>
-                  <option value="Corporativo">Corporativo</option>
-                  <option value="E-commerce">E-commerce</option>
-                  <option value="Marketplace">Marketplace</option>
-                  <option value="Pessoa Física">Pessoa Física</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="label-field">Frequência de envios</label>
-                <select className="input-field" value={frequencia} onChange={(e) => setFrequencia(e.target.value)}>
-                  <option value="Semanal">Semanal</option>
-                  <option value="Mensal">Mensal</option>
-                  <option value="Eventual">Eventual</option>
-                </select>
-              </div>
-              <div>
-                <label className="label-field">Faixa de valor médio</label>
-                <select className="input-field" value={gasto} onChange={(e) => setGasto(e.target.value)}>
-                  <option value="Até R$ 500">Até R$ 500</option>
-                  <option value="R$ 500 - R$ 2.500">R$ 500 - R$ 2.500</option>
-                  <option value="R$ 2.500 - R$ 10.000">R$ 2.500 - R$ 10.000</option>
-                  <option value="Acima de R$ 10.000">Acima de R$ 10.000</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <button type="submit" disabled={salvando} className="btn-primary">
-                {salvando ? <Spinner className="h-4 w-4 text-white" /> : null}
-                Salvar dados cadastrais
-              </button>
-            </div>
-          </form>
+          <PerfilDadosForm
+            key={`${user?.id_usuario ?? ''}-${user?.nome_completo ?? ''}-${cliente?.data_nascimento ?? ''}-${cliente?.tipo_vinculo ?? ''}-${cliente?.frequencia_compra ?? ''}-${cliente?.faixa_gasto_medio ?? ''}`}
+            user={user}
+            cliente={cliente}
+            salvando={salvando}
+            onSave={salvarPerfil}
+          />
 
           <form onSubmit={salvarSenha} className="card-surface space-y-4 p-6">
             <div className="flex items-center gap-2">
@@ -362,7 +402,7 @@ export default function AuditoriaView() {
           </form>
         </div>
       ) : loading ? (
-        <TableSkeleton rows={5} />
+        <ListSkeleton rows={5} />
       ) : aba === 'usuarios' && isAdmin ? (
         <div className="space-y-4">
           <div className="flex justify-end">
@@ -453,8 +493,9 @@ export default function AuditoriaView() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => removerCategoria(c)}
+                    onClick={() => setCategoriaExcluir(c)}
                     className="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-700"
+                    title="Remover categoria"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -626,6 +667,31 @@ export default function AuditoriaView() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(categoriaExcluir)}
+        onClose={() => setCategoriaExcluir(null)}
+        title="Confirmar exclusão"
+      >
+        <p className="text-sm text-gray-600">
+          Deseja remover a categoria <strong className="text-gray-900">{categoriaExcluir?.descricao}</strong>? Essa ação
+          não pode ser desfeita.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={() => setCategoriaExcluir(null)} className="btn-secondary">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={salvando}
+            onClick={confirmarExclusaoCategoria}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {salvando ? <Spinner className="h-4 w-4 text-white" /> : null}
+            Remover categoria
+          </button>
+        </div>
       </Modal>
     </div>
   );

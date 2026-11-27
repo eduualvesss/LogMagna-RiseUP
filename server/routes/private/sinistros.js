@@ -5,6 +5,14 @@ const ocorrenciasRouter = express.Router();
 const sinistrosRouter = express.Router();
 const documentosRouter = express.Router();
 
+const STATUS_ENCERRADOS = ['Indenizado', 'Não acionado', 'Negado', 'Encerrado'];
+
+function normalizarStatusSinistro(raw, fallback) {
+  const s = typeof raw === 'string' && raw.trim() ? raw.trim().slice(0, 50) : fallback;
+  if (s === 'Em Análise') return 'Em análise';
+  return s;
+}
+
 // ---------------- OCORRENCIA ----------------
 
 const SELECT_OCORRENCIA = `
@@ -207,7 +215,7 @@ sinistrosRouter.post('/', (req, res) => {
 
   const idSinistro = db.gerarId('SIN');
   const agora = db.agoraIso();
-  const statusFinal = typeof status === 'string' && status.trim() ? status.trim().slice(0, 50) : 'Em análise';
+  const statusFinal = normalizarStatusSinistro(status, 'Em análise');
   const valorNum =
     valor_indenizado !== undefined && valor_indenizado !== null && valor_indenizado !== ''
       ? Number(valor_indenizado)
@@ -227,7 +235,7 @@ sinistrosRouter.post('/', (req, res) => {
       agora,
       statusFinal,
       valorNum,
-      statusFinal === 'Indenizado' || statusFinal === 'Não acionado' ? agora : null,
+      STATUS_ENCERRADOS.includes(statusFinal) ? agora : null,
       typeof etapa_mais_dificil === 'string' && etapa_mais_dificil.trim() ? etapa_mais_dificil.trim().slice(0, 120) : null,
       typeof motivo_nao_acionamento === 'string' && motivo_nao_acionamento.trim() ? motivo_nao_acionamento.trim().slice(0, 255) : null,
       ocorrencia.id_ocorrencia,
@@ -267,7 +275,7 @@ sinistrosRouter.put('/:id', (req, res) => {
     return res.status(400).json({ error: 'Caracteres HTML (< ou >) não são permitidos.' });
   }
 
-  const novoStatus = typeof status === 'string' && status.trim() ? status.trim().slice(0, 50) : atual.status;
+  const novoStatus = normalizarStatusSinistro(status, atual.status);
   const valorNum =
     valor_indenizado === undefined
       ? atual.valor_indenizado
@@ -282,8 +290,10 @@ sinistrosRouter.put('/:id', (req, res) => {
   let encerramento = atual.data_encerramento;
   if (typeof data_encerramento === 'string') {
     encerramento = data_encerramento.trim() || null;
-  } else if ((novoStatus === 'Indenizado' || novoStatus === 'Encerrado' || novoStatus === 'Não acionado') && !encerramento) {
-    encerramento = db.agoraIso();
+  } else if (STATUS_ENCERRADOS.includes(novoStatus)) {
+    if (!encerramento) encerramento = db.agoraIso();
+  } else {
+    encerramento = null;
   }
 
   db.transaction(() => {

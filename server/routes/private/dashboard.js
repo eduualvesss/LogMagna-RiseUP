@@ -62,7 +62,7 @@ router.get('/', (req, res) => {
      INNER JOIN OCORRENCIA o ON o.id_ocorrencia = s.ocorrencia_id_ocorrencia
      INNER JOIN REMESSA r ON r.id_remessa = o.id_remessa
      INNER JOIN PEDIDO p ON p.id_pedido = r.id_pedido
-     ${wherePedido ? `${wherePedido} AND` : 'WHERE'} s.status NOT IN ('Indenizado', 'Não acionado', 'Encerrado')`,
+     ${wherePedido ? `${wherePedido} AND` : 'WHERE'} s.status NOT IN ('Indenizado', 'Não acionado', 'Negado', 'Encerrado')`,
     ...params
   );
 

@@ -39,8 +39,8 @@ router.get('/', (req, res) => {
   const params = [];
 
   if (busca) {
-    conds.push('(LOWER(nome) LIKE ? OR LOWER(cidade) LIKE ?)');
-    params.push(`%${busca}%`, `%${busca}%`);
+    conds.push('(LOWER(nome) LIKE ? OR LOWER(cidade) LIKE ? OR LOWER(tipo) LIKE ? OR LOWER(estado) LIKE ?)');
+    params.push(`%${busca}%`, `%${busca}%`, `%${busca}%`, `%${busca}%`);
   }
   if (status) {
     conds.push('status = ?');

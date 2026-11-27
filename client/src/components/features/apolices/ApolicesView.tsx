@@ -38,6 +38,7 @@ export default function ApolicesView() {
   const [editSegId, setEditSegId] = useState<string | null>(null);
   const [segNome, setSegNome] = useState('');
   const [segContato, setSegContato] = useState('');
+  const [segExcluir, setSegExcluir] = useState<SeguradoraItem | null>(null);
 
   function abrirNovaApolice() {
     setEditApoliceId(null);
@@ -125,15 +126,21 @@ export default function ApolicesView() {
     }
   }
 
-  async function excluirSeguradora(s: SeguradoraItem) {
+  async function confirmarExcluirSeguradora() {
+    if (!segExcluir) return;
+    setSalvando(true);
     setErroAcao('');
     setMsg('');
     try {
-      await segurosService.deleteSeguradora(s.id_seguradora);
-      setMsg(`Seguradora ${s.razao_social} removida.`);
+      await segurosService.deleteSeguradora(segExcluir.id_seguradora);
+      setMsg(`Seguradora ${segExcluir.razao_social} removida.`);
+      setSegExcluir(null);
       await recarregar();
     } catch (err) {
       setErroAcao(err instanceof Error ? err.message : 'Erro ao excluir seguradora.');
+      setSegExcluir(null);
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -271,7 +278,7 @@ export default function ApolicesView() {
                         <button onClick={() => abrirEditarSeguradora(s)} className="text-[#1a3326] hover:underline text-xs font-semibold inline-flex items-center gap-1">
                           <Pencil size={13} /> Editar
                         </button>
-                        <button onClick={() => void excluirSeguradora(s)} className="text-red-600 hover:underline text-xs font-semibold inline-flex items-center gap-1">
+                        <button onClick={() => setSegExcluir(s)} className="text-red-600 hover:underline text-xs font-semibold inline-flex items-center gap-1">
                           <Trash2 size={13} /> Excluir
                         </button>
                       </td>
@@ -352,6 +359,34 @@ export default function ApolicesView() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(segExcluir)}
+        onClose={() => setSegExcluir(null)}
+        title="Confirmar exclusão"
+      >
+        <p className="text-sm text-slate-600">
+          Deseja remover a seguradora <strong className="text-slate-900">{segExcluir?.razao_social}</strong>? Essa ação
+          não pode ser desfeita.
+        </p>
+        <div className="mt-5 flex justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => setSegExcluir(null)}
+            className="px-4 py-2 border border-slate-200 rounded-xl text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={salvando}
+            onClick={confirmarExcluirSeguradora}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {salvando && <Spinner size={14} />} Remover seguradora
+          </button>
+        </div>
       </Modal>
     </div>
   );

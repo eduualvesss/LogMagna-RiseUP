@@ -34,7 +34,7 @@ export function NotificacoesProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   return (
-    <NotifContext.Provider value={{ naoLidas, refreshNotificacoes }}>
+    <NotifContext.Provider value={{ naoLidas: user ? naoLidas : 0, refreshNotificacoes }}>
       {children}
     </NotifContext.Provider>
   );

@@ -13,6 +13,28 @@ body {
   background: #f8faf9;
 }
 
+@layer components {
+  .card-surface {
+    @apply bg-white rounded-2xl border border-slate-200/80 shadow-xs;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-[#1a3326] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#274837] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer;
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-[#1a3326] focus:outline-none focus:ring-2 focus:ring-[#1a3326]/10;
+  }
+
+  .label-field {
+    @apply mb-1.5 block text-xs font-semibold text-slate-700;
+  }
+}
+
 /* --- Animacoes e loadings --- */
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(10px); }

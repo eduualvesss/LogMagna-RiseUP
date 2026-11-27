@@ -5,6 +5,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, ArrowRight, PackageSearch, Search, Truck } from 'lucide-react';
+import { useAuth } from '@/hooks/auth-context';
 import { usePublicTracking } from '@/hooks/useTracking';
 import { formatarDataExtenso, formatarDataHora, statusBadgeVariant } from '@/lib/format';
 import { Alert } from '@/components/ui/Alert';
@@ -14,6 +15,7 @@ import { Skeleton, Spinner } from '@/components/ui/Loading';
 import { Logo } from '@/components/ui/Logo';
 
 function PublicTrackingContent({ initialCode }: { initialCode: string }) {
+  const { user } = useAuth();
   const [code, setCode] = useState(initialCode);
   const { data, loading, erro, buscar } = usePublicTracking(initialCode);
 
@@ -31,12 +33,23 @@ function PublicTrackingContent({ initialCode }: { initialCode: string }) {
             <span className="font-bold text-lg tracking-wide">LogMagna</span>
           </Link>
           <div className="flex items-center gap-3 text-sm">
-            <Link href="/login" className="px-4 py-2 rounded-lg border border-white/20 hover:bg-white/10 transition">
-              Entrar
-            </Link>
-            <Link href="/cadastro" className="px-4 py-2 rounded-lg bg-[#2d5a42] hover:bg-[#3a7054] transition">
-              Criar conta
-            </Link>
+            {user ? (
+              <Link
+                href="/dashboard"
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition inline-flex items-center gap-1.5"
+              >
+                Acessar painel <ArrowRight size={15} />
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="px-4 py-2 rounded-lg border border-white/20 hover:bg-white/10 transition">
+                  Entrar
+                </Link>
+                <Link href="/cadastro" className="px-4 py-2 rounded-lg bg-[#2d5a42] hover:bg-[#3a7054] transition">
+                  Criar conta
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>

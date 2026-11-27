@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Box, Calendar, CheckCircle, Shield, Truck } from 'lucide-react';
 import { useNotificacoesHeader } from '@/hooks/notificacoes-context';
 import { usePedidos } from '@/hooks/usePedidos';
-import { brl } from '@/lib/format';
+import { brl, parseMoedaInput } from '@/lib/format';
 import type { PedidoItem } from '@/types';
 import { Alert } from '@/components/ui/Alert';
 import { Spinner } from '@/components/ui/Loading';
@@ -57,7 +57,7 @@ export default function NovoPedidoView() {
   const set = (k: keyof NovoPedidoForm) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [k]: e.target.value }));
 
-  const valorNum = Number(String(form.valor_declarado).replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
+  const valorNum = parseMoedaInput(form.valor_declarado);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

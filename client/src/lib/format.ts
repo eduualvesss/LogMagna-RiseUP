@@ -4,6 +4,22 @@ export function brl(valor: number | string | null | undefined): string {
   return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+export function parseMoedaInput(raw: string | number | null | undefined): number {
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  }
+  const limpo = String(raw ?? '').replace(/[R$\s]/gi, '').trim();
+  if (!limpo) return 0;
+  let normalizado = limpo;
+  if (limpo.includes(',')) {
+    normalizado = limpo.replace(/\./g, '').replace(',', '.');
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(limpo)) {
+    normalizado = limpo.replace(/\./g, '');
+  }
+  const n = Number(normalizado);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 export function formatarData(iso?: string | null): string {
   if (!iso) return '—';
   const matchDataSimples = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
@@ -40,7 +56,7 @@ export type BadgeVariant = 'neutral' | 'success' | 'warning' | 'danger' | 'info'
 export function statusBadgeVariant(status: string, retido?: boolean): BadgeVariant {
   if (retido || status === 'Retido' || status === 'Documentação pendente') return 'warning';
   if (status === 'Em trânsito' || status === 'Aprovado' || status === 'Indenizado') return 'success';
-  if (status === 'Cancelado') return 'danger';
+  if (status === 'Cancelado' || status === 'Negado') return 'danger';
   if (status === 'Entregue' || status === 'Encerrado' || status === 'Não acionado') return 'neutral';
   return 'info';
 }

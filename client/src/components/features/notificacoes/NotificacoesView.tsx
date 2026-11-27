@@ -11,7 +11,7 @@ import { suporteService } from '@/services/suporte.service';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Spinner, TableSkeleton } from '@/components/ui/Loading';
+import { ListSkeleton, Spinner } from '@/components/ui/Loading';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Tabs } from '@/components/ui/Tabs';
@@ -20,7 +20,7 @@ export default function NotificacoesView() {
   const { isAdmin } = useAuth();
   const { refreshNotificacoes } = useNotificacoesHeader();
   const [filtro, setFiltro] = useState<'todas' | 'nao_lidas'>('todas');
-  const { items, naoLidas, loading, erro, recarregar } = useNotificacoes(filtro);
+  const { items, naoLidas, total, loading, erro, recarregar } = useNotificacoes(filtro);
 
   const [erroAcao, setErroAcao] = useState('');
   const [msg, setMsg] = useState('');
@@ -113,13 +113,13 @@ export default function NotificacoesView() {
         value={filtro}
         onChange={setFiltro}
         items={[
-          { id: 'todas', label: 'Todas', count: filtro === 'todas' ? items.length : undefined },
+          { id: 'todas', label: 'Todas', count: total },
           { id: 'nao_lidas', label: 'Não lidas', count: naoLidas },
         ]}
       />
 
       {loading ? (
-        <TableSkeleton rows={4} />
+        <ListSkeleton rows={4} />
       ) : items.length === 0 ? (
         <EmptyState
           icon={Bell}
